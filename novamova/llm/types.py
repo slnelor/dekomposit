@@ -9,9 +9,11 @@ from pydantic import BaseModel, Field
 class TranslationPhrase(BaseModel):
     """A translation pair object (phrase_source, phrase_translated)"""
 
-    phrase_source: str = Field(description="Source phrase")
+    phrase_source: str = Field(
+        description="A natural phrase chunk 1+ words. Can be: a clause, idiom, phrasal verb, or semantic unit or word. Punctuation MUST be attached to the last word - NEVER create entries like '.', '—', '!' alone."
+    )
     phrase_translated: str = Field(
-        description="Translated phrase. It can consist of 1 and more words"
+        description="Translation of phrase_source maintaining natural phrase boundaries. Keep idioms together. Attach all punctuation to words."
     )
 
 
@@ -36,10 +38,10 @@ class PhraseDetailed(TranslationPhrase):
 
 
 class Translation(BaseModel):
-    """Translation object"""
+    """Translation object - decomposes text into natural phrase chunks (typically 1+ words)"""
 
     translation: List[TranslationPhrase] = Field(
-        description="List of TranslationPhrase objects"
+        description="List of natural phrase pairs. Decompose into chunks or individual words. CRITICAL: Never create separate entries for standalone punctuation marks (., —, !, ?). Always attach punctuation to the preceding word."
     )
 
 
