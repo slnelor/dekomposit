@@ -100,39 +100,58 @@ class TranslationPrompt:
             )
         self.source_lang = source_lang
         self.target_lang = target_lang
-        self._instruction_prompt = (
-            f"1. Translate between {self.source_lang} ↔ {self.target_lang}. Auto-detect direction.\n"
-            f"Keep the translation natural, correct, accurate as much as possible."
-            f"Preserve the tone, mood, and intent."
-            f"2. Mixed languages → translate to {self.target_lang}.\n"
-            f"(e.g. Привет world -> Hellow world [source_lang: russian, target_lang: english])"
-            f"3. Errors (grammar/spelling/punctuation) → correct in output.\n"
-            f"4. Correct the punctuation and the sentence if needed so that it would be essentially and naturally"
-            f"Special characters → delete them. Links, names, technical jargon -> keep them original.\n\n"
-            f"Untranslatable nonsense -> keep the output empty\n"
-            f"### Examples of correct rules observation:\n"
-            f'1. Consider the following "hello" and translate it into russian, Gemini [source_lang: english, target_lang: ukrainian]'
-            f'Correct answer: The translation of the whole input including the content in quotes or etc... into target_lang: ukrainian'
-            f'(Розляньте наступне "Привіт" і перекладіть його російською, Gemini)'
-            f'One more example: Translate this into russian'
-            f'(Переклади це на російську)'
-            f'One more example: Ahoj, plrelož to na angličtinu'
-            f'(Привіт, переклади це на англійську)'
-            f"2. Привет мир, how are ю? [source_lang: russian, target_lang: ukrainian]"
-            f'Correct answer: The translation of the input in english only (Привіт світ, як справи?)'
-            f'3, 4. Прив как дела чо делаеш шо за прИДллажение Я НИ понЭЛ [source_lang: russian, target_lang: english'
-            f'Correct answer: The translation of the corrected input'
-            f"(Hey, how are you doing? What are you doing? What's the deal? I don't get it at all!)"
-            f"5. Почему мой AutoParser Xd13 не работает на ts? Ведь в документации все работает - https://example.org/something"
-            f'[source_lang: russian, target_lang: slovak] Correct asnwer: Keep tech jargon, names, links while translating'
-            f'(Prečo môj AutoParser Xd13 nefunguje na ts? Veď v dokumentácii všetko funguje - https://example.org/something")'
-            f'6. 43994fd (Answer - ""), [](*&@H() (answer - ""), link.com/hithere (answer - ""), listasalistlolbrohow (answer - "")'
-        )
-        self._system_prompt = (
-            f"You are a dedicated {self.source_lang}-{self.target_lang}\n"
-            f"/ {self.target_lang}-{self.source_lang} translator.\n"
-            f"Your task is defined by this singular function."
-        )
+
+        self._instruction_prompt = dedent(f"""\
+            1. Translate between {self.source_lang} ↔ {self.target_lang}. Auto-detect direction.
+               Keep the translation natural, correct, and accurate as much as possible.
+               Preserve the tone, mood, and intent.
+
+            2. Mixed languages → translate to {self.target_lang}.
+               (e.g. Привет world -> Hello world [source_lang: russian, target_lang: english])
+
+            3. Errors (grammar/spelling/punctuation) → correct in output.
+
+            4. Correct the punctuation and the sentence if needed so that it would be natural.
+               Special characters → delete them.
+               Links, names, technical jargon → keep them original.
+
+            5. Untranslatable nonsense → keep the output empty.
+
+            ### Examples of correct rules observation:
+
+            1. Consider the following "hello" and translate it into russian, Gemini
+               [source_lang: english, target_lang: ukrainian]
+               Correct answer: The translation of the whole input including the content
+               in quotes or etc... into target_lang: ukrainian
+               (Розгляньте наступне "Привіт" і перекладіть його російською, Gemini)
+
+               One more example: Translate this into russian
+               (Переклади це на російську)
+
+               One more example: Ahoj, prelož to na angličtinu
+               (Привіт, переклади це на англійську)
+
+            2. Привет мир, how are ю? [source_lang: russian, target_lang: ukrainian]
+               Correct answer: The translation of the input in english only
+               (Привіт світ, як справи?)
+
+            3, 4. Прив как дела чо делаеш шо за прИДллажение Я НИ понЭЛ
+               [source_lang: russian, target_lang: english]
+               Correct answer: The translation of the corrected input
+               (Hey, how are you doing? What are you doing? What's the deal? I don't get it at all!)
+
+            5. Почему мой AutoParser Xd13 не работает на ts? Ведь в документации все работает - https://example.org/something
+               [source_lang: russian, target_lang: slovak]
+               Correct answer: Keep tech jargon, names, links while translating
+               (Prečo môj AutoParser Xd13 nefunguje na ts? Veď v dokumentácii všetko funguje - https://example.org/something)
+
+            6. 43994fd (Answer - ""), [](*&@H() (Answer - ""), link.com/hithere (Answer - ""), listasalistlolbrohow (Answer - "")
+        """)
+
+        self._system_prompt = dedent(f"""\
+            You are a dedicated {self.source_lang}-{self.target_lang} / {self.target_lang}-{self.source_lang} translator.
+            Your task is defined by this singular function.
+        """)
         self._examples = EXAMPLES
         self._example_annotations = EXAMPLE_ANNOTATIONS
 
@@ -176,9 +195,12 @@ class TranslationPrompt:
         return _ready_str
 
     def get_prompt(self, user_input: str):
-        return (
-            f"{self.instructions}\n\n"
-            f"Examples\n\n{self.examples}\n"
-            f"USER INPUT: {user_input}\n"
-            f"ASSISTANT:"
-        )
+        return dedent(f"""\
+            {self.instructions}
+
+            Examples
+
+            {self.examples}
+            USER INPUT: {user_input}
+            ASSISTANT:
+        """)
