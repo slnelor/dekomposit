@@ -1,13 +1,13 @@
-# NovaMova - Gaining language knowledge through the dialogues
+# dekomposit - Gaining language knowledge through the dialogues
 
-Project NovaMova was planned as a game, but transformed into a tool.
+Project dekomposit was planned as a game, but transformed into a tool.
 
 You are stuck in another country, so you are forced to learn language. You have got translator, vocabulary storage and such things as
 dilogues to learn something, episodes - short movies, and other stuff. 
 Through episodes you gain new information & words. Through dialogues you practice this information.
 
 ## Why?
-Project NovaMova is designed so that it helps you learn words & grammar in another language.
+Project dekomposit is designed so that it helps you learn words & grammar in another language.
 
 ## Features
 - Translation
