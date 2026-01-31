@@ -15,7 +15,6 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich.prompt import Prompt
-from rich.style import Style
 
 from dekomposit.llm.base_client import Client
 from dekomposit.llm.prompts import TranslationPrompt
@@ -35,9 +34,11 @@ class TokenUsage:
 
 @dataclass
 class TranslationResult:
-    """Translation with token usage."""
+    """Translation with token usage and debug info."""
     translation: Translation
     usage: TokenUsage
+    prompt_messages: list[dict]  # Full prompt messages sent to LLM
+    raw_response: str  # Raw JSON response from LLM
 
 
 class ChatMessage:
@@ -68,7 +69,7 @@ class TranslationTUI:
         console.print(
             f"[dim]Source:[/dim] [cyan]{self.source_lang.value}[/cyan]  "
             f"[dim]Target:[/dim] [cyan]{self.target_lang.value}[/cyan]  "
-            f"[dim]Commands:[/dim] [yellow]/lang[/yellow] [yellow]/clear[/yellow] [yellow]/exit[/yellow]\n"
+            f"[dim]Commands:[/dim] [yellow]/help[/yellow]\n"
         )
 
     def display_history(self):
@@ -168,16 +169,97 @@ class TranslationTUI:
 
         if cmd == "/help" or cmd == "/?":
             console.print(Panel(
-                "[yellow]/lang[/yellow]  - Change source/target languages\n"
-                "[yellow]/clear[/yellow] - Clear chat history\n"
-                "[yellow]/exit[/yellow]  - Exit the application\n"
-                "[yellow]/help[/yellow]  - Show this help",
+                "[yellow]/lang[/yellow]   - Change source/target languages\n"
+                "[yellow]/clear[/yellow]  - Clear chat history\n"
+                "[yellow]/prompt[/yellow] - Show full prompt for last translation\n"
+                "[yellow]/raw[/yellow]    - Show raw LLM output for last translation\n"
+                "[yellow]/usage[/yellow]  - Show total token usage for session\n"
+                "[yellow]/exit[/yellow]   - Exit the application\n"
+                "[yellow]/help[/yellow]   - Show this help",
                 title="Commands",
                 border_style="dim"
             ))
             return True
 
+        if cmd == "/prompt":
+            self._show_last_prompt()
+            return True
+
+        if cmd == "/raw":
+            self._show_last_raw()
+            return True
+
+        if cmd == "/usage" or cmd == "/tokens":
+            self._show_total_usage()
+            return True
+
         return False
+
+    def _get_last_result(self) -> Optional[TranslationResult]:
+        """Get the last translation result from history."""
+        for msg in reversed(self.history):
+            if msg.role == "assistant" and msg.result:
+                return msg.result
+        return None
+
+    def _show_last_prompt(self):
+        """Display the full prompt for the last translation."""
+        result = self._get_last_result()
+        if not result:
+            console.print("[dim]No translation in history.[/dim]\n")
+            return
+
+        for msg in result.prompt_messages:
+            role = msg["role"]
+            content = msg["content"]
+            console.print(Panel(
+                content,
+                title=f"[bold]{role.upper()}[/bold]",
+                border_style="cyan" if role == "system" else "green",
+            ))
+        console.print()
+
+    def _show_last_raw(self):
+        """Display the raw LLM output for the last translation."""
+        result = self._get_last_result()
+        if not result:
+            console.print("[dim]No translation in history.[/dim]\n")
+            return
+
+        console.print(Panel(
+            result.raw_response,
+            title="[bold]RAW OUTPUT[/bold]",
+            border_style="yellow",
+        ))
+        console.print()
+
+    def _show_total_usage(self):
+        """Display total token usage for the session."""
+        total_prompt = 0
+        total_completion = 0
+        total_tokens = 0
+        request_count = 0
+
+        for msg in self.history:
+            if msg.role == "assistant" and msg.result:
+                total_prompt += msg.result.usage.prompt_tokens
+                total_completion += msg.result.usage.completion_tokens
+                total_tokens += msg.result.usage.total_tokens
+                request_count += 1
+
+        if request_count == 0:
+            console.print("[dim]No translations in history.[/dim]\n")
+            return
+
+        console.print(Panel(
+            f"[cyan]Requests:[/cyan]    {request_count}\n"
+            f"[cyan]Input:[/cyan]       {total_prompt:,} tokens\n"
+            f"[cyan]Output:[/cyan]      {total_completion:,} tokens\n"
+            f"[cyan]Total:[/cyan]       {total_tokens:,} tokens",
+            title="[bold]SESSION USAGE[/bold]",
+            border_style="magenta",
+        ))
+        console.print()
 
     async def translate_text(self, text: str) -> Optional[TranslationResult]:
         """Translate text with loading indicator."""
@@ -186,12 +268,14 @@ class TranslationTUI:
                 prompt = TranslationPrompt(self.source_lang, self.target_lang)
                 prompt_text = prompt.get_prompt(text)
 
+                messages = [
+                    {"role": "system", "content": prompt.system_prompt},
+                    {"role": "user", "content": prompt_text},
+                ]
+
                 client = Client()
                 response = await client.request(
-                    messages=[
-                        {"role": "system", "content": prompt.system_prompt},
-                        {"role": "user", "content": prompt_text},
-                    ],
+                    messages=messages,
                     return_format=Translation,
                 )
 
@@ -201,8 +285,14 @@ class TranslationTUI:
                     total_tokens=response.usage.total_tokens,
                 )
                 translation = response.choices[0].message.parsed
+                raw_response = response.choices[0].message.content
 
-            return TranslationResult(translation=translation, usage=usage)
+            return TranslationResult(
+                translation=translation,
+                usage=usage,
+                prompt_messages=messages,
+                raw_response=raw_response,
+            )
         except Exception as e:
             console.print(f"[red]Error: {e}[/red]")
             return None
