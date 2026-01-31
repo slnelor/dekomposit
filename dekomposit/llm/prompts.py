@@ -1,90 +1,88 @@
-import itertools
+from dataclasses import dataclass
 from textwrap import dedent
 
-from dekomposit.config import (
-    SECTION_PLACEHOLDER,
-    TRANSLATION_TAG_END,
-    TRANSLATION_TAG_START,
-)
 from dekomposit.llm.types import Language, Translation
 
-EXAMPLE_ANNOTATIONS = [
-    "natural phrases, punctuation attached",
-    "idiom kept as complete unit",
-    "phrasal verb as single phrase",
-    "short sentence kept whole, errors corrected",
-    "grammar corrected, natural chunking",
-    "misspelling corrected, punctuation attached",
-    "special chars with adjacent words",
-    "untranslatable article omitted",
-    "em-dash attached, natural phrase boundaries",
-    "whole sentence - simple input",
-    "wordplay/tongue-twister kept together",
-]
+
+@dataclass
+class TranslationExample:
+    """A translation example with phrase pairs and annotation."""
+
+    phrases: list[tuple[str, str]]  # [(source, target), ...]
+    annotation: str = ""
+
+    def to_dict(self) -> dict:
+        """Convert to the dict format expected by the LLM."""
+        return {
+            "translation": [
+                {"phrase_source": src, "phrase_translated": tgt}
+                for src, tgt in self.phrases
+            ]
+        }
+
+    def reconstruct(self, sep: str = " ") -> tuple[str, str]:
+        """Reconstruct full sentences from chunks."""
+        source = sep.join(src for src, _ in self.phrases)
+        target = sep.join(tgt for _, tgt in self.phrases)
+        return source, target
+
 
 EXAMPLES = [
-    {
-        "translation": [
-            {"phrase_source": "I love", "phrase_translated": "J'aime"},
-            {"phrase_source": "Paris.", "phrase_translated": "Paris."},
+    TranslationExample(
+        phrases=[("I love", "J'aime"), ("Paris.", "Paris.")],
+        annotation="natural phrases, punctuation attached",
+    ),
+    TranslationExample(
+        phrases=[("He kicked the bucket", "Il est mort"), ("yesterday.", "hier.")],
+        annotation="idiom kept as complete unit",
+    ),
+    TranslationExample(
+        phrases=[("She gave up", "Elle a abandonné"), ("smoking.", "la cigarette.")],
+        annotation="phrasal verb as single phrase",
+    ),
+    TranslationExample(
+        phrases=[("Hello, world!", "Bonjour, monde!")],
+        annotation="short sentence kept whole, errors corrected",
+    ),
+    TranslationExample(
+        phrases=[("He go to", "Il va à"), ("school.", "l'école.")],
+        annotation="grammar corrected, natural chunking",
+    ),
+    TranslationExample(
+        phrases=[("Helo!", "Bonjour!")],
+        annotation="misspelling corrected, punctuation attached",
+    ),
+    TranslationExample(
+        phrases=[("I love", "Me encanta"), ("❤️ coding!", "❤️ programar!")],
+        annotation="special chars with adjacent words",
+    ),
+    TranslationExample(
+        phrases=[
+            ("Please send", "お願いします送ってください"),
+            ("the documents", "書類を"),
         ],
-    },
-    {
-        "translation": [
-            {"phrase_source": "He kicked the bucket", "phrase_translated": "Il est mort"},
-            {"phrase_source": "yesterday.", "phrase_translated": "hier."},
+        annotation="untranslatable article omitted",
+    ),
+    TranslationExample(
+        phrases=[
+            ("Time flies —", "Le temps passe vite —"),
+            ("says the proverb.", "dit le proverbe."),
         ],
-    },
-    {
-        "translation": [
-            {"phrase_source": "She gave up", "phrase_translated": "Elle a abandonné"},
-            {"phrase_source": "smoking.", "phrase_translated": "la cigarette."},
+        annotation="em-dash attached, natural phrase boundaries",
+    ),
+    TranslationExample(
+        phrases=[("Break a leg!", "Ні пуху ні пера!")],
+        annotation="whole sentence - simple input",
+    ),
+    TranslationExample(
+        phrases=[
+            (
+                "She sells seashells by the seashore.",
+                "Elle vend des coquillages au bord de la mer.",
+            )
         ],
-    },
-    {
-        "translation": [
-            {"phrase_source": "Hello, world!", "phrase_translated": "Bonjour, monde!"}
-        ],
-    },
-    {
-        "translation": [
-            {"phrase_source": "He go to", "phrase_translated": "Il va à"},
-            {"phrase_source": "school.", "phrase_translated": "l'école."},
-        ],
-    },
-    {
-        "translation": [
-            {"phrase_source": "Helo!", "phrase_translated": "Bonjour!"},
-        ],
-    },
-    {
-        "translation": [
-            {"phrase_source": "I love", "phrase_translated": "Me encanta"},
-            {"phrase_source": "❤️ coding!", "phrase_translated": "❤️ programar!"},
-        ],
-    },
-    {
-        "translation": [
-            {"phrase_source": "Please send", "phrase_translated": "お願いします送ってください"},
-            {"phrase_source": "the documents", "phrase_translated": "書類を"},
-        ],
-    },
-    {
-        "translation": [
-            {"phrase_source": "Time flies —", "phrase_translated": "Le temps passe vite —"},
-            {"phrase_source": "says the proverb.", "phrase_translated": "dit le proverbe."},
-        ],
-    },
-    {
-        "translation": [
-            {"phrase_source": "Break a leg!", "phrase_translated": "Ні пуху ні пера!"}
-        ],
-    },
-    {
-        "translation": [
-            {"phrase_source": "She sells seashells by the seashore.", "phrase_translated": "Elle vend des coquillages au bord de la mer."}
-        ],
-    },
+        annotation="wordplay/tongue-twister kept together",
+    ),
 ]
 
 # NOT ALL LANGUAGES AVAILABLE YET
@@ -101,7 +99,8 @@ class TranslationPrompt:
         self.source_lang = source_lang
         self.target_lang = target_lang
 
-        self._instruction_prompt = dedent(f"""\
+        self._instruction_prompt = dedent(
+            f"""\
             1. Translate between {self.source_lang} ↔ {self.target_lang}. Auto-detect direction.
                Keep the translation natural, correct, and accurate as much as possible.
                Preserve the tone, mood, and intent.
@@ -146,14 +145,16 @@ class TranslationPrompt:
                (Prečo môj AutoParser Xd13 nefunguje na ts? Veď v dokumentácii všetko funguje - https://example.org/something)
 
             6. 43994fd (Answer - ""), [](*&@H() (Answer - ""), link.com/hithere (Answer - ""), listasalistlolbrohow (Answer - "")
-        """)
+        """
+        )
 
-        self._system_prompt = dedent(f"""\
+        self._system_prompt = dedent(
+            f"""\
             You are a dedicated {self.source_lang}-{self.target_lang} / {self.target_lang}-{self.source_lang} translator.
             Your task is defined by this singular function.
-        """)
+        """
+        )
         self._examples = EXAMPLES
-        self._example_annotations = EXAMPLE_ANNOTATIONS
 
     @property
     def system_prompt(self):
@@ -185,22 +186,22 @@ class TranslationPrompt:
         return _translation_pairs
 
     @property
-    def examples(self):
-        items = itertools.zip_longest(self._examples, self._example_annotations)
-
-        _ready_str = ""
-        for ex, note in items:
-            _ready_str = f"{_ready_str}Next example{' (' + note + ')' + '\n' if note else '\n'}{str(ex).strip()}\n\n"
-
-        return _ready_str
+    def examples(self) -> str:
+        result = ""
+        for ex in self._examples:
+            annotation_part = f" ({ex.annotation})\n" if ex.annotation else "\n"
+            result += f"Next example{annotation_part}{ex.to_dict()}\n\n"
+        return result
 
     def get_prompt(self, user_input: str):
-        return dedent(f"""\
+        return dedent(
+            f"""\
             {self.instructions}
 
             Examples
 
             {self.examples}
             USER INPUT: {user_input}
-            ASSISTANT:
-        """)
+        ASSISTANT:
+        """
+        )
