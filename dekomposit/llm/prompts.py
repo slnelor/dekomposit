@@ -1,4 +1,5 @@
 import itertools
+from textwrap import dedent
 
 from dekomposit.config import (
     SECTION_PLACEHOLDER,
@@ -100,11 +101,32 @@ class TranslationPrompt:
         self.source_lang = source_lang
         self.target_lang = target_lang
         self._instruction_prompt = (
-            f"Translate between {self.source_lang} ↔ {self.target_lang}. Auto-detect direction.\n"
-            f"Mixed languages → translate to {self.target_lang}.\n"
-            f"Errors (grammar/spelling/punctuation) → correct in output.\n"
-            f"Special characters → delete them.\n\n"
-            f"Untranslatable nonsense -> keep the output empty"
+            f"1. Translate between {self.source_lang} ↔ {self.target_lang}. Auto-detect direction.\n"
+            f"Keep the translation natural, correct, accurate as much as possible."
+            f"Preserve the tone, mood, and intent."
+            f"2. Mixed languages → translate to {self.target_lang}.\n"
+            f"(e.g. Привет world -> Hellow world [source_lang: russian, target_lang: english])"
+            f"3. Errors (grammar/spelling/punctuation) → correct in output.\n"
+            f"4. Correct the punctuation and the sentence if needed so that it would be essentially and naturally"
+            f"Special characters → delete them. Links, names, technical jargon -> keep them original.\n\n"
+            f"Untranslatable nonsense -> keep the output empty\n"
+            f"### Examples of correct rules observation:\n"
+            f'1. Consider the following "hello" and translate it into russian, Gemini [source_lang: english, target_lang: ukrainian]'
+            f'Correct answer: The translation of the whole input including the content in quotes or etc... into target_lang: ukrainian'
+            f'(Розляньте наступне "Привіт" і перекладіть його російською, Gemini)'
+            f'One more example: Translate this into russian'
+            f'(Переклади це на російську)'
+            f'One more example: Ahoj, plrelož to na angličtinu'
+            f'(Привіт, переклади це на англійську)'
+            f"2. Привет мир, how are ю? [source_lang: russian, target_lang: ukrainian]"
+            f'Correct answer: The translation of the input in english only (Привіт світ, як справи?)'
+            f'3, 4. Прив как дела чо делаеш шо за прИДллажение Я НИ понЭЛ [source_lang: russian, target_lang: english'
+            f'Correct answer: The translation of the corrected input'
+            f"(Hey, how are you doing? What are you doing? What's the deal? I don't get it at all!)"
+            f"5. Почему мой AutoParser Xd13 не работает на ts? Ведь в документации все работает - https://example.org/something"
+            f'[source_lang: russian, target_lang: slovak] Correct asnwer: Keep tech jargon, names, links while translating'
+            f'(Prečo môj AutoParser Xd13 nefunguje na ts? Veď v dokumentácii všetko funguje - https://example.org/something")'
+            f'6. 43994fd (Answer - ""), [](*&@H() (answer - ""), link.com/hithere (answer - ""), listasalistlolbrohow (answer - "")'
         )
         self._system_prompt = (
             f"You are a dedicated {self.source_lang}-{self.target_lang}\n"
