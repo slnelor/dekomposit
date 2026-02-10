@@ -4,11 +4,17 @@ This file provides guidance for agentic coding assistants working in the **dekom
 
 ## Project Overview
 
-**dekomposit** is a language learning service that decomposes translations into natural phrase chunks to improve vocabulary acquisition. The project uses LLMs (OpenAI, Gemini) for translation and evaluation.
+**dekomposit** is a language learning service with dual interfaces:
+
+1. **Telegram AI Agent** (primary) - Conversational language coach in Telegram
+2. **Web Platform** - Extended features (reading, vocabulary dashboard)
+
+The core uses LLMs (OpenAI, Gemini) to provide personalized language learning experiences.
 
 - **Language**: Python 3.14
 - **Architecture**: Async-first with Pydantic models, OpenAI SDK with custom base URLs
-- **Stack**: Will evolve to FastAPI + PostgreSQL + SQLAlchemy (currently core translation features)
+- **Telegram Bot**: aiogram (async framework)
+- **Web Stack**: FastAPI + PostgreSQL + SQLAlchemy + htmx frontend
 
 ## Environment Setup
 
@@ -18,25 +24,11 @@ source .venv/bin/activate  # Linux/Mac
 .venv\Scripts\activate     # Windows
 
 # Environment variables are in .env (git-ignored)
-# Key variables: CURRENT_API_KEY, LLM_MODEL, LLM_SERVER, LLM_TEMPERATURE, LLM_MAX_TOKENS
+# Key variables: CURRENT_API_KEY, LLM_MODEL, LLM_SERVER, LLM_TEMPERATURE,
+#                LLM_MAX_TOKENS, TELEGRAM_BOT_TOKEN
 ```
 
 ## Development Commands
-
-### Running Tests & Evaluation
-
-```bash
-# Run LLM evaluation with DeepEval (GEval metrics)
-python -m dekomposit.llm.evaluation
-
-# Run specific evaluation functions in Python:
-# >>> from dekomposit.llm.evaluation import geval_test_llm, bert_test_llm
-# >>> import asyncio
-# >>> asyncio.run(bert_test_llm())  # BERTScore semantic similarity
-# >>> geval_test_llm()              # DeepEval GEval translation quality
-```
-
-**Note**: Currently no pytest test files exist. Tests are evaluation-based (see `dekomposit/llm/evaluation.py`).
 
 ### Code Quality Tools
 
@@ -68,15 +60,17 @@ from functools import lru_cache
 # Third-party
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
+from aiogram import Bot, Dispatcher, Router
+from aiogram.types import Message
 
 # Local
 from dekomposit.config import DEFAULT_LLM
-from dekomposit.llm.types import Translation
+from dekomposit.llm.base_client import Client
 ```
 
 **Style**:
 - Avoid wildcard imports (`from module import *`)
-- Use absolute imports for clarity: `from dekomposit.llm.features import translate`
+- Use absolute imports for clarity
 - Group related imports together
 
 ### 2. Type Annotations
@@ -85,12 +79,10 @@ from dekomposit.llm.types import Translation
 
 ```python
 # Good
-async def translate(
-    text: str, *, source_lang: Language | str, target_lang: Language | str
-) -> Translation:
+async def handle_message(message: Message, user_id: int) -> None:
     ...
 
-def bert_evaluate(refs, candidates, lang="en") -> list[float]:
+def process_data(items: list[str]) -> dict[str, int]:
     ...
 
 # Modern union syntax
@@ -106,50 +98,49 @@ def __init__(self, model: str | None = None, server: str | None = None) -> None:
 
 ### 3. Async/Await Patterns
 
-**Philosophy**: This project is async-first. All LLM interactions must be async.
+**Philosophy**: This project is async-first. All LLM interactions and bot handlers must be async.
 
 ```python
 # Correct: async function with proper await
-async def translate(text: str, *, source_lang: str, target_lang: str) -> Translation:
+async def call_llm(prompt: str) -> str:
     client = Client()
     response = await client.request(...)
-    return response.choices[0].message.parsed
+    return response.choices[0].message.content
 
 # Correct: gathering multiple async tasks
-tasks = [translate(text, source_lang="uk", target_lang="en") for text in texts]
+tasks = [process_item(item) for item in items]
 completed = await asyncio.gather(*tasks)
+
+# Correct: aiogram message handler
+@router.message(Command("start"))
+async def cmd_start(message: Message) -> None:
+    await message.answer("Welcome!")
 ```
 
 **Rules**:
-- Use `async def` for any function that calls LLM APIs
+- Use `async def` for any function that calls LLM APIs or bot methods
 - Use `await` for all async calls (never mix sync/async incorrectly)
 - Use `asyncio.gather()` for parallel execution
 - Run async functions with `asyncio.run()` from sync contexts
+- All aiogram handlers must be async
 
 ### 4. Pydantic Models
 
 **Structured Output**: Use Pydantic models for LLM response schemas.
 
 ```python
-class TranslationPhrase(BaseModel):
-    phrase_source: str = Field(
-        description="A natural phrase chunk 1+ words..."
-    )
-    phrase_translated: str = Field(
-        description="Translation of phrase_source..."
-    )
-
-class Translation(BaseModel):
-    translation: list[TranslationPhrase] = Field(
-        description="List of natural phrase pairs..."
-    )
+class VocabularyEntry(BaseModel):
+    word: str = Field(description="The vocabulary word")
+    translation: str = Field(description="Translation of the word")
+    example: str = Field(description="Example sentence using the word")
+    difficulty: int = Field(description="Difficulty level 1-5", ge=1, le=5)
 ```
 
 **Guidelines**:
 - Use `Field()` with detailed descriptions (helps LLM structured output)
 - Use `list[Type]` instead of `List[Type]` in Python 3.9+
 - Use `str | None` for optional fields or `Optional[str]`
-- Use StrEnum for string enumerations (see `Language` class)
+- Use StrEnum for string enumerations
 
 ### 5. Logging
 
@@ -171,20 +162,18 @@ logger.info(f"LLMCALL {response.id}\tTOKENS USED: {usage.total_tokens}")
 
 ### 6. Naming Conventions
 
-- **Classes**: `PascalCase` (e.g., `TranslationPrompt`, `Client`)
-- **Functions/Methods**: `snake_case` (e.g., `translate()`, `get_prompt()`)
-- **Constants**: `UPPER_SNAKE_CASE` (e.g., `DEFAULT_LLM`, `TRANSLATION_TAG_START`)
-- **Private attributes**: Prefix with `_` (e.g., `self._instruction_prompt`)
-- **Module names**: `snake_case` (e.g., `base_client.py`, `types.py`)
+- **Classes**: `PascalCase` (e.g., `TranslationBot`, `Client`)
+- **Functions/Methods**: `snake_case` (e.g., `translate()`, `get_response()`)
+- **Constants**: `UPPER_SNAKE_CASE` (e.g., `DEFAULT_LLM`, `MAX_TOKENS`)
+- **Private attributes**: Prefix with `_` (e.g., `self._api_key`)
+- **Module names**: `snake_case` (e.g., `base_client.py`, `handlers.py`)
 
 ### 7. Error Handling
 
 ```python
 # Validate inputs explicitly
-if (source_lang not in Language) or (target_lang not in Language):
-    raise ValueError(
-        "Incorrect language. See all supported languages in dekomposit.llm.types.Language"
-    )
+if not user_id:
+    raise ValueError("user_id is required")
 
 # Handle environment variables gracefully
 LLM_SERVER = os.getenv("LLM_SERVER", DEFAULT_SERVER)
@@ -202,27 +191,18 @@ if LLM_SERVER.lower() in ["none", "null"]:
 Use concise docstrings for non-obvious functions:
 
 ```python
-async def translate(text: str, *, source_lang: Language | str, target_lang: Language | str) -> Translation:
-    """Translate text between languages using LLM with phrase decomposition."""
+async def handle_vocab_save(message: Message, word: str) -> None:
+    """Save a vocabulary word to the user's collection."""
     ...
 
-def bert_evaluate(refs, candidates, lang="en"):
-    """Evaluate candidate texts against reference texts using BERTScore."""
+def calculate_difficulty(word: str, user_level: str) -> int:
+    """Estimate word difficulty based on user's proficiency level."""
     ...
 ```
 
 **Style**: Simple one-liner describing what the function does. No need for elaborate multi-line docstrings unless the function is complex.
 
 ## Project-Specific Rules
-
-### Translation Philosophy
-
-**Critical**: Translations must decompose into natural phrase chunks:
-- Keep idioms together as single units (e.g., "kick the bucket" → one phrase)
-- Preserve phrasal verbs (e.g., "give up" → one phrase)
-- **NEVER create standalone punctuation entries** (e.g., `{"phrase_source": ".", "phrase_translated": "."}`). Always attach punctuation to adjacent words.
-- Auto-correct grammar/spelling errors in input
-- Preserve special characters in position
 
 ### LLM Configuration
 
@@ -231,6 +211,35 @@ def bert_evaluate(refs, candidates, lang="en"):
 - Always log token usage for each LLM request
 - Use structured output parsing with `chat.completions.parse()`
 
+### Telegram Bot Design
+
+- Bot personality is defined in `dekomposit/llm/prompting/SOUL.md`
+- Use aiogram's `Router` for organizing handlers
+- All handlers must be async
+- Use `Message.answer()` for responses, not `Bot.send_message()` when possible
+- Implement inline mode for translations in any chat
+- Use callback queries for interactive elements (save to vocab, etc.)
+
+### Platform-Specific Features
+
+**Telegram-only**:
+- Daily push notifications (vocabulary packs)
+- Streak tracking and reminders
+- Inline mode for quick translations
+- Interactive dialogue in chat (bot plays one speaker, user the other)
+
+**Web-only**:
+- Reading section with inline translation
+- Full vocabulary dashboard
+- Trusted Authors paper library
+- Account/settings management UI
+
+**Shared**:
+- Translation core
+- Vocabulary storage (backend)
+- Example generation
+- Learning method logic
+
 ## File Organization
 
 ```
@@ -238,35 +247,32 @@ dekomposit/
 ├── config.py              # Environment config, constants
 ├── llm/
 │   ├── __init__.py        # Empty
-│   ├── types.py           # Pydantic models (TranslationPhrase, Translation, Language)
 │   ├── base_client.py     # AsyncOpenAI wrapper (Client class)
-│   ├── prompts.py         # Prompt engineering (TranslationPrompt)
-│   ├── features.py        # Main translate() function
-│   └── evaluation.py      # DeepEval + BERTScore evaluation
+│   └── prompting/
+│       └── SOUL.md        # Bot personality definition
+├── bot/                   # (Planned) Telegram bot code
+│   ├── handlers/          # Message/command handlers
+│   ├── keyboards.py       # Inline keyboards
+│   └── main.py            # Bot entry point
+├── web/                   # (Planned) FastAPI web app
+│   ├── api/               # API routes
+│   ├── models.py          # SQLAlchemy models
+│   └── main.py            # FastAPI app
+└── services/              # (Planned) Shared business logic
+    ├── translation.py     # Translation service
+    ├── vocabulary.py      # Vocab CRUD
+    └── user.py            # User management
 ```
 
 ## Common Tasks
 
-### Adding a new language
+### Updating bot personality
 
-1. Add to `Language` enum in `dekomposit/llm/types.py`
-2. Test with existing evaluation examples
-
-### Adding a new feature function
-
-1. Create async function in `dekomposit/llm/features.py`
-2. Use `Client` class for LLM calls
-3. Define Pydantic model for structured output
-4. Add prompt class in `prompts.py` if needed
-
-### Running evaluation
-
-```bash
-python -m dekomposit.llm.evaluation  # Runs geval_test_llm() by default
-```
+Edit `dekomposit/llm/prompting/SOUL.md` to change the conversational tone and teaching approach.
 
 ## References
 
 - Full tech requirements: `docs/tech_requirements.md`
 - Project context: `CLAUDE.md`
+- Bot personality: `dekomposit/llm/prompting/SOUL.md`
 - Python version: **3.14**

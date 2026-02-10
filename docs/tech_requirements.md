@@ -1,4 +1,4 @@
-# dekomposit - Gain new lexicon -> revise -> repeat. 
+# dekomposit - Gain new lexicon -> revise -> repeat.
 
 
 ## Why?
@@ -7,6 +7,35 @@ When you learn new words it's good to use several ways, like listening,
 reading, speaking, writing. To make it easier, dekomposit
 provides you with different tools and methods to learn -
 from hand-writing to watching short animations and reading dialogues.
+
+dekomposit is available as a **Telegram AI agent** and a **web platform**.
+The Telegram bot is the primary interface for quick, conversational learning
+on the go. The web platform provides a richer experience for reading,
+vocabulary management, and extended learning sessions.
+
+
+## Platforms
+
+### Telegram AI Agent
+The Telegram bot is the core interface for dekomposit. It acts as a personal
+language coach that users interact with conversationally. Key capabilities:
+- Translate words and phrases on demand
+- Deliver daily vocabulary packs via scheduled messages
+- Run interactive dialogue exercises in chat
+- Quiz users on saved vocabulary
+- Send reminders and track streaks
+- Provide instant definitions, examples, and corrections
+
+The bot personality and behavior are defined in `dekomposit/llm/prompting/SOUL.md`.
+
+### Web Platform
+The web platform extends the Telegram experience with features that benefit
+from a full browser interface:
+- Reading section with inline translation
+- Vocabulary dashboard and progress tracking
+- Paper library (Trusted Authors)
+- Extended learning method sessions
+- Account management and settings
 
 
 ## Features
@@ -27,7 +56,10 @@ Along the translation there will be a pixel-art picture that is associated with 
 Not all translations will have pictures.
 
 If user's input contains mistakes, it is corrected by dekomposer and user can see a corrected version.
- 
+
+**Telegram**: User sends a word/phrase, bot replies with decomposed translation.
+**Web**: Translation page with full layout (definitions, examples, pixel-art).
+
 ### 2. Examples
 User will have access to example sentences/texts/dialogues (next Example) etc. for a specific word/phrase/topic (next: unit).
 Examples will have three sections:
@@ -38,12 +70,18 @@ Examples will have three sections:
 In each Example user will have a feature to translate that Example
 sentence by sentence.
 
+**Telegram**: Bot sends examples inline after translation or on request.
+**Web**: Dedicated examples panel on the translation page.
+
 ### 3. Vocabulary
 User will have a vocabulary storage (next Vocab). Vocab is used to practice new lexicon
 via Learning Method (see in next sections). Also dekomposer decides which examples are used
 based on your language level and Vocab.
 
 User will be able to add the word to the Vocab.
+
+**Telegram**: Tap to save a word, use commands to review saved words.
+**Web**: Full vocabulary dashboard with filters, search, and export.
 
 ### 4. Learning Method
 To practice Vocab dekomposit uses this Learning Method:
@@ -56,6 +94,9 @@ the system randomly.
 
 The system can force the user to write down words in input and on paper as well.
 
+**Telegram**: Bot guides user through steps interactively in chat.
+**Web**: Structured learning session page with progress indicators.
+
 ### Today's Pack of Memorizing
 It is a feature that generates 10 to 20 new units that are absent from the
 user's Vocab. This pack is updated every day at 12:00 AM UTC. The pack's lexicon
@@ -67,6 +108,9 @@ ways:
 
 The algorithm prioritizes: 1) Current Events, 2) Most important topics for your Vocab, 3) Random selection (for B2-C1 users).
 
+**Telegram**: Daily push notification with the pack. User learns directly in chat.
+**Web**: Displayed on the dashboard homepage.
+
 ### Reading
 There will be a section/page in dekomposit service where users can read
 books, articles, stories (next Papers) published by the Trusted Authors (See in the next sections).
@@ -77,6 +121,8 @@ Note: We may add a feature that user cannot copy anything from Papers so that he
 the needed units manually for better memorization. In this case, the inline translation
 tool will be absent, user will need to type the unit in a translation input above the text.
 
+**Telegram**: Not available (web-only feature due to rich UI requirements).
+**Web**: Full reading experience with inline translation.
 
 ### Reading Storage
 A storage for keeping track of all read Papers and status (like Paper "Harry Potter" - 40% read, Paper N - 12% read)
@@ -92,6 +138,8 @@ can open the Paper.
 It is a tool that is present on every Paper of the dekomposit service. It highlights
 the units that can be translated into Target Language (see next sections)
 by hovering on them. By pressing on the unit, the user sees the translation of the unit.
+
+**Web-only feature**.
 
 ### Trusted Authors
 Trusted Authors are those who can publish Papers globally on the dekomposit Reading
@@ -110,7 +158,7 @@ If you were approved -> You will get an answer from us and you'll get
 Trusted Author Mark in your profile.
 
 By becoming a Trusted Author you agree to the following:
-1. You will not publish spam or content unrelated to the platform’s purpose.
+1. You will not publish spam or content unrelated to the platform's purpose.
 2. You will not advertise yourself, third parties, or external services.
 3. You will not publish prohibited information, including content related to drugs, political propaganda, or other restricted topics.
 4. You will not distribute or promote forbidden materials.
@@ -134,6 +182,9 @@ fill in the gaps in replica, chat to the Dialogue.
 Interactive dialogues are part of the Dekomposer Pack. Note that
 user has access to more and longer dialogues with Dekomposer Pack.
 
+**Telegram**: Interactive dialogues run natively in chat - the bot plays one speaker, the user plays the other.
+**Web**: Dedicated dialogue page with chat-like UI.
+
 ### Sentences
 Sentences are part of the Translation page (Examples section). Each sentence
 is generated by the following algorithm:
@@ -156,7 +207,7 @@ Not described yet (soon).
 By subscribing to our Dekomposer Pack user gets:
 1. 1,000 available requests to paid Methods
 2. Access to Episodes
-3. Access to Interactive Dialogues 
+3. Access to Interactive Dialogues
 4. Higher input limits - up to 10,000 symbols
 5. High quality audio
 6. More and longer dialogue examples
@@ -166,7 +217,7 @@ By subscribing to our Dekomposer Pack user gets:
 ## Tech Details
 ### 1. Translation
 - User input limit: 1,000 symbols (logged in, nonpremium)
-                    500 (logged out)
+                    500 (logged out / Telegram anonymous)
                     10,000 (logged in, premium)
 
 ### 2. Examples
@@ -192,8 +243,10 @@ File size of the Paper is limited to 100 MB.
 User will have the following fields:
 - Username
 - Email
+- Telegram ID (linked when user starts the bot)
 
-User will receive an email to pass the Login/Registration.
+User will receive an email to pass the Login/Registration on the web platform.
+Telegram users authenticate by starting the bot and optionally linking their web account.
 
 Profile:
 - Source Language (Native language of the user)
@@ -207,6 +260,20 @@ Important: User's Vocab is not included in the prompt, LLM decides on it's own w
 are needed and executes a tool that checks whether there is the word/phrase in the user's Vocab.
 Instead of User's Vocab, we pass to the LLM it's compressed version: labels of topics that are
 present in the Vocab.
+
+### 5. Telegram Bot Architecture
+- Built with aiogram (async Telegram bot framework)
+- Shares the same backend services as the web platform
+- Bot commands: /start, /translate, /vocab, /daily, /level, /settings, /help
+- Inline mode support for quick translations in any chat
+- Callback queries for interactive exercises and vocabulary saving
+- Scheduled tasks for daily packs and streak reminders
+
+### 6. Web Platform Architecture
+- Backend: FastAPI
+- Frontend: HTML, CSS, JavaScript (htmx)
+- Database: PostgreSQL + SQLAlchemy
+- Shared service layer with Telegram bot
 
 ### Costs & Profits
 All costs = ~$25/mo

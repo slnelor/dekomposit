@@ -1,97 +1,93 @@
 # dekomposit
 
-> **Gain new lexicon → revise → repeat.**
+> **Gain new lexicon -> revise -> repeat.**
 
-A language learning service with an unusual approach: learn vocabulary through multiple methods—from handwriting to short animations and interactive dialogues.
+A language learning AI agent on Telegram and a web platform. Learn vocabulary through conversational AI coaching, interactive exercises, and immersive reading.
 
-## 🎯 Why dekomposit?
+## Why dekomposit?
 
-Traditional language learning focuses on single methods. Dekomposit combines listening, reading, speaking, and writing into one platform, making vocabulary acquisition more effective through diverse, reinforcing experiences.
+Traditional language learning focuses on single methods. Dekomposit combines listening, reading, speaking, and writing into one service. The Telegram bot acts as a personal language coach you can talk to anytime, while the web platform provides a richer experience for reading and vocabulary management.
 
-## ✨ Features
+## Platforms
 
-### Core Features
-- **🔤 Smart Translation** - Decomposes translations into natural phrase chunks (idioms, phrasal verbs preserved)
-  - Auto-corrects grammar/spelling mistakes
-  - Provides definitions, examples, and pixel-art illustrations
-  - Multiple translation methods (ReversoContext, ChatGPT, etc.)
-  
-- **📚 Vocabulary Storage** - Personal vocabulary tracker with intelligent example generation based on your level
+### Telegram AI Agent (primary)
+- Conversational language coach available 24/7
+- Daily vocabulary packs pushed to your chat
+- Interactive dialogue exercises in conversation
+- Vocabulary quizzes and streak tracking
+- Inline mode for quick translations in any Telegram chat
 
-- **💬 Dialogues** - AI-generated conversational practice tailored to your vocabulary and proficiency
-  - Interactive tasks: correct mistakes, fill gaps, chat with AI
-  - Sentence-by-sentence translation
+### Web Platform
+- Reading section with inline translation (Trusted Authors library)
+- Vocabulary dashboard with filters, search, and export
+- Extended learning sessions with progress tracking
+- Account management and settings
 
-- **📖 Reading Section** - Community-powered reading library
-  - Books, articles, stories from Trusted Authors
-  - Inline translation with hover/click
-  - Reading progress tracking
+## Features
 
-- **🎓 Learning Method** - Structured practice system
-  1. Memorize units with translations/images
-  2. Read/listen to texts with those units
-  3. Write your own examples
-  4. Take optional challenges
-
-- **📦 Today's Pack of Memorizing** - Daily 10-20 new words based on current events or your learning gaps
+### Core
+- **Conversational AI Coach** - Personal language learning assistant in Telegram with customizable personality
+- **Vocabulary Storage** - Track your learned words with intelligent practice scheduling
+- **Interactive Dialogues** - Practice conversations with AI-generated dialogue exercises tailored to your level
+- **Reading Section** (web) - Community-powered reading library with inline translation
+- **Learning Method** - Structured practice: memorize -> read/listen -> write -> repeat -> test
+- **Daily Vocabulary Packs** - 10-20 new words every day based on current events or your learning gaps
 
 ### Premium (Dekomposer Pack)
 - 1,000 requests to paid LLM methods
-- Access to Episodes (short movies)
+- Access to Episodes
 - Interactive dialogues with advanced tasks
 - 10,000 symbol input limit (vs. 1,000 free)
 - High-quality audio (TTS)
 - More/longer examples
 
-## 🚀 Project Status
+## Project Status
 
-**Early Development** - Core translation feature implemented (0/17 features complete)
+**Early Development** - Core LLM client and CLI implemented.
 
-### Completed ✅
-- LLM-powered phrase-by-phrase translation
-- Multi-language support (13 languages)
-- Pydantic-based structured output
-- Evaluation framework (BERTScore + DeepEval)
+### Completed
+- AsyncOpenAI client wrapper with structured output
+- Bot personality definition (SOUL.md)
+- Multi-provider LLM support (OpenAI, Gemini)
 
-### In Progress 🚧
+### In Progress
+- Telegram bot (aiogram)
 - FastAPI backend
 - PostgreSQL + SQLAlchemy
+- Prompt engineering for language learning
+
+### Planned
 - User authentication & profiles
-- Vocabulary storage
-
-### Planned 📋
-- Reading section with Trusted Authors
+- Vocabulary storage and tracking
+- Translation with phrase decomposition
 - Interactive dialogues
-- Episodes (short movies)
-- Daily word packs
+- Reading section with Trusted Authors
+- Daily word packs with push notifications
+- Episodes
 - Anki/Quizlet export
-- Browser extension
-- Mobile app & Telegram bot
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-- **Backend**: FastAPI
-- **Database**: PostgreSQL + SQLAlchemy
-- **LLM**: OpenAI SDK (Gemini, ChatGPT via OpenAI API)
-- **APIs**: ReversoAPI (fallback)
-- **Frontend**: HTML, CSS, JavaScript (htmx planned)
 - **Language**: Python 3.14
-- **Evaluation**: DeepEval, BERTScore
+- **Telegram Bot**: aiogram (async)
+- **Web Backend**: FastAPI
+- **Database**: PostgreSQL + SQLAlchemy
+- **LLM**: OpenAI SDK (Gemini, ChatGPT via OpenAI-compatible API)
+- **APIs**: ReversoAPI (fallback)
+- **Web Frontend**: HTML, CSS, JavaScript (htmx)
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 dekomposit/
-├── config.py           # Environment & LLM settings
+├── config.py              # Environment & LLM settings
 └── llm/
-    ├── base_client.py  # AsyncOpenAI wrapper
-    ├── features.py     # translate() and future features
-    ├── prompts.py      # Translation prompt engineering
-    ├── types.py        # Pydantic models (Translation, Language)
-    └── evaluation.py   # Quality testing suite
+    ├── base_client.py     # AsyncOpenAI wrapper
+    └── prompting/
+        └── SOUL.md        # Bot personality definition
 ```
 
-## 🔧 Setup
+## Setup
 
 ```bash
 # Clone repository
@@ -108,41 +104,15 @@ pip install -r requirements.txt
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your API keys
+# Edit .env with your API keys and Telegram bot token
 ```
 
-## 📊 Development
-
-```bash
-# Run translation evaluation
-python -m dekomposit.llm.evaluation
-
-# Test translation in Python
-from dekomposit.llm.features import translate
-import asyncio
-
-result = asyncio.run(translate(
-    "Привіт, світ!",
-    source_lang="ukrainian",
-    target_lang="english"
-))
-print(result)
-```
-
-## 📄 Documentation
+## Documentation
 
 - [Technical Requirements](docs/tech_requirements.md) - Full feature specifications
 - [Agent Instructions](AGENTS.md) - Guidelines for AI coding assistants
 - [Claude Context](CLAUDE.md) - Project context for Claude Code
 
-## 🤝 Contributing
-
-Contributions welcome! See [docs/tech_requirements.md](docs/tech_requirements.md) for feature roadmap.
-
-## 📜 License
+## License
 
 [Add your license here]
-
----
-
-**Note**: Project is in active development. Features and documentation are subject to change.

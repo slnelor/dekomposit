@@ -4,7 +4,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**dekomposit** (formerly NovaMova) is a language learning service that helps users gain vocabulary through translation, dialogues, and reading. The project decomposes translations into natural phrase chunks to improve readability and learning outcomes.
+**dekomposit** (formerly NovaMova) is a language learning service with two interfaces:
+1. **Telegram AI agent** (primary) - Personal language coach in Telegram
+2. **Web platform** - Extended features like reading, vocabulary management
+
+The project uses LLMs to provide conversational language learning experiences.
+
+## Dual Platform Architecture
+
+### Telegram Bot
+- Primary user interface
+- Built with aiogram (async Telegram bot framework)
+- Conversational AI agent (personality defined in `dekomposit/llm/prompting/SOUL.md`)
+- Commands: /start, /translate, /vocab, /daily, /level, /settings, /help
+- Inline mode support
+- Shares backend services with web platform
+
+### Web Platform
+- Secondary interface for richer experiences
+- FastAPI backend
+- HTML/CSS/JS frontend (htmx)
+- Features: reading section, vocabulary dashboard, account management
+- Shares service layer with Telegram bot
 
 ## Development Commands
 
@@ -16,16 +37,6 @@ source .venv/bin/activate  # Linux/Mac
 
 # Install dependencies (if needed)
 pip install -r requirements.txt  # when requirements.txt exists
-```
-
-### Running Tests and Evaluation
-```bash
-# Run LLM evaluation with BERT scoring
-python -m dekomposit.llm.evaluation
-
-# Or run specific evaluation functions:
-# - geval_test_llm() - Uses DeepEval GEval metrics for translation quality
-# - bert_test_llm() - Uses BERTScore for semantic similarity
 ```
 
 ### Development
@@ -44,7 +55,7 @@ ruff check dekomposit/
 **dekomposit/config.py**
 - Configuration management using `python-dotenv`
 - LLM settings (model, server, API keys, temperature, max_tokens)
-- Constants for translation formatting (tags, placeholders)
+- Constants for application configuration
 
 **dekomposit/llm/base_client.py**
 - `Client` class: AsyncOpenAI wrapper for LLM interactions
@@ -52,37 +63,10 @@ ruff check dekomposit/
 - Uses structured output parsing with Pydantic models via `chat.completions.parse()`
 - Logs token usage for each request
 
-**dekomposit/llm/types.py**
-- `TranslationPhrase`: Basic source-target phrase pair
-- `PhraseDetailed`: Extended with definitions, parts of speech, synonyms, antonyms, examples
-- `Translation`: Container for list of phrase pairs
-- `Language`: Enum of supported languages (EN, ES, FR, DE, IT, PT, PL, UK, SK, RU, CS, ZH, JA)
-
-**dekomposit/llm/prompts.py**
-- `TranslationPrompt`: Generates prompts for translation tasks
-- Auto-detects translation direction (source ↔ target)
-- Corrects grammar, spelling, and punctuation errors in input
-- Includes 11 annotated examples showing proper phrase chunking (idioms, phrasal verbs, punctuation handling)
-
-**dekomposit/llm/features.py**
-- `translate()`: Main async function to translate text
-- Takes text, source_lang, target_lang and returns `Translation` object
-- Uses Client + TranslationPrompt for LLM interaction
-
-**dekomposit/llm/evaluation.py**
-- Evaluation framework using DeepEval and BERTScore
-- `bert_evaluate()`: Semantic similarity scoring
-- `geval_test_llm()`: Translation correctness and JSON structure compliance
-- Contains test examples in Ukrainian-English pairs
-
-### Translation Philosophy
-
-The translation system decomposes input into **natural phrase chunks** (1+ words):
-- Idioms kept together as single units (e.g., "kick the bucket" → "Il est mort")
-- Phrasal verbs preserved (e.g., "give up" → "abandonner")
-- Punctuation attached to adjacent words, never standalone
-- Grammar/spelling errors automatically corrected
-- Special characters preserved in position
+**dekomposit/llm/prompting/SOUL.md**
+- Defines the Telegram bot's personality and behavior
+- "You are a personal coacher who helps me learn languages."
+- This file guides the AI agent's conversational tone and teaching approach
 
 ### Environment Configuration
 
@@ -92,34 +76,49 @@ The `.env` file contains:
 - `LLM_SERVER`: API endpoint URL (OpenAI or Gemini with OpenAI compatibility)
 - `LLM_TEMPERATURE`: Temperature setting (default: 0.2)
 - `LLM_MAX_TOKENS`: Max output tokens (default: 1024)
+- `TELEGRAM_BOT_TOKEN`: Bot token from @BotFather
 - API keys for various providers
 
 ### Key Design Patterns
 
-1. **Async-First**: All LLM calls use async/await
+1. **Async-First**: All LLM calls and bot handlers use async/await
 2. **Structured Output**: Pydantic models enforce response schema via OpenAI's structured output feature
-3. **Prompt Engineering**: Few-shot examples with annotations guide model behavior
-4. **Error Correction**: Input mistakes auto-corrected in translation
-5. **Language Agnostic**: Auto-detects translation direction
+3. **Conversational AI**: Bot acts as a personal language coach with personality
+4. **Shared Services**: Telegram bot and web platform share the same backend logic
 
 ## Important Notes
 
 - The project uses OpenAI SDK with custom base URLs to support multiple providers (OpenAI, Gemini)
 - Gemini models accessed via OpenAI-compatible endpoint: `https://generativelanguage.googleapis.com/v1beta/openai/`
-- All translation outputs must follow strict phrase chunking rules (no standalone punctuation)
 - Python 3.14 is the target version
-- Backend will eventually be FastAPI with PostgreSQL + SQLAlchemy (not yet implemented)
+- Telegram bot is built with aiogram (async framework)
+- Backend uses FastAPI with PostgreSQL + SQLAlchemy (not yet fully implemented)
 
 ## Project Status
 
-Early development phase. Core translation feature implemented with evaluation framework. See `docs/tech_requirements.md` for full feature roadmap including:
-- Vocabulary storage
-- Dialogues generation
-- Reading section with inline translation
-- Community features
-- Multiple learning method
+Early development phase. Core LLM client and CLI implemented.
 
-### Better project understanding
-If you need more information of project explanation look up
-in @/home/mikhail/ForPython/Afono_Wanders/docs/tech_requirements.md
+**Completed:**
+- AsyncOpenAI client wrapper
+- Bot personality definition
 
+**In Progress:**
+- Telegram bot implementation (aiogram)
+- Backend API (FastAPI)
+- Database layer (PostgreSQL + SQLAlchemy)
+- Prompt engineering for language learning
+
+**Planned:**
+See `docs/tech_requirements.md` for full feature roadmap including:
+- Translation with phrase decomposition
+- Vocabulary storage and tracking
+- Interactive dialogues (Telegram chat + web UI)
+- Reading section with inline translation (web only)
+- Daily vocabulary packs with push notifications (Telegram)
+- Community features (Trusted Authors)
+- Premium tier (Dekomposer Pack)
+
+### Better Project Understanding
+For detailed feature specifications and platform distribution (Telegram vs Web), see:
+- `docs/tech_requirements.md` - Complete technical requirements
+- `dekomposit/llm/prompting/SOUL.md` - Bot personality definition
