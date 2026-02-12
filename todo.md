@@ -1,2 +1,0 @@
-# Project mechanics
-- Word translations
