@@ -21,6 +21,7 @@ coverage/
 *.old
 *.zip
 *.tar.gz
+.deepeval/
 *.egg-info/
 pip-wheel-metadata/
 htmlcov/
