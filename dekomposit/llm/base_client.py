@@ -43,14 +43,17 @@ class Client:
         messages: list[dict],
         return_format: type[BaseModel],
         model: str | None = None,
+        temperature: float | None = None,
     ):
         """A method wrapper around openai.chat.completions.parse"""
         model = model or self.model
+        temperature = temperature if temperature is not None else LLM_CONFIG["temperature"]
 
         response = await self.client().chat.completions.parse(
             model=model,
             messages=messages,
             response_format=return_format,
+            temperature=temperature,
         )
 
         usage = response.usage

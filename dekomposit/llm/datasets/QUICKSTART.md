@@ -8,7 +8,10 @@ Get started with translation dataset generation and review in 5 minutes.
 # Activate environment
 source .venv/bin/activate
 
-# Generate 5,000 pairs per direction (60,000 total)
+# Interactive generator (default 5,000 pairs per direction)
+python -m dekomposit.llm.datasets.generate_cli
+
+# Or run the generator directly (customize in code)
 python -m dekomposit.llm.datasets.translation_data_gen
 ```
 

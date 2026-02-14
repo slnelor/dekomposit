@@ -23,6 +23,44 @@ from rich.text import Text
 from dekomposit.llm.types import Translation
 
 
+def check_translation_quality(pair: Translation) -> list[str]:
+    """Check for common translation issues.
+    
+    Returns list of warning messages.
+    """
+    warnings = []
+    source = (pair.source or "").strip()
+    target = (pair.translated or "").strip()
+    
+    if not source or not target:
+        return warnings
+    
+    # Check if source and target are identical (untranslated)
+    if source.lower() == target.lower():
+        warnings.append("⚠️  Identical source/target (untranslated?)")
+    
+    # Check length ratio (source vs target)
+    len_ratio = len(target) / len(source) if len(source) > 0 else 0
+    if len_ratio > 3 or len_ratio < 0.3:
+        warnings.append(f"⚠️  Unusual length ratio: {len_ratio:.1f}x")
+    
+    # Check for Slavic languages: warn about potential declination issues
+    slavic_langs = {"ru", "uk", "sk"}
+    if pair.from_lang in slavic_langs or pair.to_lang in slavic_langs:
+        # Look for common patterns that might indicate wrong declination
+        # This is a simple heuristic - not perfect but helpful
+        source_words = source.split()
+        target_words = target.split()
+        
+        # Check if word count is very different (might indicate missing/extra words)
+        if len(target_words) > len(source_words) * 2:
+            warnings.append("⚠️  Target much longer (check declination/grammar)")
+        elif len(target_words) < len(source_words) * 0.5:
+            warnings.append("⚠️  Target much shorter (missing words?)")
+    
+    return warnings
+
+
 logging.basicConfig(
     datefmt="%d/%m/%Y %H:%M",
     format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s",
@@ -96,7 +134,7 @@ class ReviewState:
 class PairReviewer:
     """Interactive pair reviewer with Rich UI."""
 
-    def __init__(self, batch_size: int = 10):
+    def __init__(self, batch_size: int = 4):
         self.batch_size = batch_size
         self.console = Console()
         self.data_dir = Path(__file__).parent
@@ -221,44 +259,59 @@ class PairReviewer:
             from_lang = (pair.from_lang or "source").upper()
             to_lang = (pair.to_lang or "target").upper()
 
+            # Check for quality warnings
+            warnings = check_translation_quality(pair)
+
             self.console.print(
                 f"[{style}]{status} [{i}][/{style}] {edited_mark}",
                 style=style,
             )
             self.console.print(f"  [cyan]{from_lang}:[/cyan] {source}")
             self.console.print(f"  [magenta]{to_lang}:[/magenta] {target}")
+            
+            # Show warnings if any
+            if warnings:
+                for warning in warnings:
+                    self.console.print(f"  [yellow]{warning}[/yellow]")
+            
             self.console.print()
 
     def show_help(self) -> None:
         """Show help panel."""
         help_text = Text()
-        help_text.append("Commands:\n", style="bold")
-        help_text.append("  a  ", style="green bold")
-        help_text.append("- Approve all in batch\n")
-        help_text.append("  d  ", style="red bold")
-        help_text.append("- Deny all in batch\n")
-        help_text.append("  1-0", style="yellow bold")
-        help_text.append(" - Toggle approve/deny for pair #\n")
-        help_text.append("  e  ", style="blue bold")
-        help_text.append("- Edit a pair\n")
-        help_text.append("  n  ", style="cyan bold")
-        help_text.append("- Next batch\n")
-        help_text.append("  p  ", style="cyan bold")
-        help_text.append("- Previous batch\n")
+        help_text.append("Quick Commands:\n\n", style="bold cyan")
+        
+        help_text.append("  SPACE or ENTER  ", style="green bold")
+        help_text.append("→ Approve all & next batch\n")
+        
+        help_text.append("  x               ", style="red bold")
+        help_text.append("→ Reject all & next batch\n\n")
+        
+        help_text.append("Individual pairs:\n", style="bold yellow")
+        help_text.append("  1-4  ", style="yellow bold")
+        help_text.append("→ Toggle approve/reject\n")
+        help_text.append("  e    ", style="blue bold")
+        help_text.append("→ Edit pair (s=source, t=target, b=both)\n\n")
+        
+        help_text.append("Navigation:\n", style="bold cyan")
+        help_text.append("  n / →  ", style="cyan bold")
+        help_text.append("→ Next batch\n")
+        help_text.append("  p / ←  ", style="cyan bold")
+        help_text.append("→ Previous batch\n\n")
+        
+        help_text.append("Other:\n", style="bold dim")
         help_text.append("  s  ", style="magenta bold")
-        help_text.append("- Show statistics\n")
-        help_text.append("  h  ", style="dim bold")
-        help_text.append("- Show this help\n")
+        help_text.append("→ Statistics\n")
         help_text.append("  q  ", style="dim bold")
-        help_text.append("- Save and quit\n")
+        help_text.append("→ Save & quit\n")
 
-        self.console.print(Panel(help_text, title="[bold]Help[/bold]", border_style="dim"))
+        self.console.print(Panel(help_text, title="[bold]Keyboard Shortcuts[/bold]", border_style="cyan"))
 
     def edit_pair(
         self, pairs: list[Translation], batch_index: int, state: ReviewState
     ) -> None:
-        """Edit a specific pair."""
-        pair_num = Prompt.ask("[cyan]Which pair to edit (1-10)?[/cyan]")
+        """Edit a specific pair with better UX."""
+        pair_num = Prompt.ask("[cyan]Which pair to edit (1-4)?[/cyan]")
 
         try:
             pair_idx = int(pair_num) - 1
@@ -281,20 +334,46 @@ class PairReviewer:
             from_lang = pair.from_lang or "source"
             to_lang = pair.to_lang or "target"
             
-            self.console.print(f"\n[cyan]Current {from_lang.upper()}:[/cyan] {source}")
-            new_source = Prompt.ask(
-                f"[cyan]New {from_lang.upper()} (Enter to keep)[/cyan]",
-                default=source,
-            )
-
-            self.console.print(f"\n[magenta]Current {to_lang.upper()}:[/magenta] {target}")
-            new_target = Prompt.ask(
-                f"[magenta]New {to_lang.upper()} (Enter to keep)[/magenta]",
-                default=target,
-            )
-
-            final_source = new_source.strip() or source
-            final_target = new_target.strip() or target
+            # Simple choice: edit source, target, or both
+            self.console.print(f"\n[cyan]{from_lang.upper()}:[/cyan] {source}")
+            self.console.print(f"[magenta]{to_lang.upper()}:[/magenta] {target}")
+            self.console.print()
+            
+            choice = Prompt.ask(
+                "[yellow]Edit:[/yellow]",
+                choices=["s", "t", "b", "c"],
+                default="c"
+            ).lower()
+            
+            if choice == "c":  # Cancel
+                return
+            
+            final_source = source
+            final_target = target
+            
+            if choice in ["s", "b"]:
+                # Edit source - pre-filled with current text
+                self.console.print(f"\n[dim]Editing {from_lang.upper()}: (Ctrl+C to cancel)[/dim]")
+                try:
+                    final_source = Prompt.ask(
+                        f"[cyan]{from_lang.upper()}[/cyan]",
+                        default=source,
+                    ).strip() or source
+                except KeyboardInterrupt:
+                    self.console.print("\n[yellow]Cancelled[/yellow]")
+                    return
+            
+            if choice in ["t", "b"]:
+                # Edit target
+                self.console.print(f"\n[dim]Editing {to_lang.upper()}: (Ctrl+C to cancel)[/dim]")
+                try:
+                    final_target = Prompt.ask(
+                        f"[magenta]{to_lang.upper()}[/magenta]",
+                        default=target,
+                    ).strip() or target
+                except KeyboardInterrupt:
+                    self.console.print("\n[yellow]Cancelled[/yellow]")
+                    return
             
             state.edited_pairs[global_idx] = {
                 "source": final_source,
@@ -305,10 +384,12 @@ class PairReviewer:
             state.approved_indices.add(global_idx)
             state.rejected_indices.discard(global_idx)
 
-            self.console.print("[green]✓ Pair edited and approved[/green]")
+            self.console.print("[green]✓ Edited and approved[/green]")
 
         except ValueError:
             self.console.print("[red]Invalid input[/red]")
+        except KeyboardInterrupt:
+            self.console.print("\n[yellow]Cancelled[/yellow]")
 
     def show_stats(self, total: int, state: ReviewState) -> None:
         """Show review statistics."""
@@ -359,23 +440,29 @@ class PairReviewer:
             start_idx = batch_index * self.batch_size
             end_idx = min(start_idx + self.batch_size, len(pairs))
 
-            action = Prompt.ask("[cyan]Action[/cyan]").lower()
+            action = Prompt.ask("[cyan]›[/cyan]").lower()
 
-            if action == "a":
-                # Approve all in batch
+            # SPACE or ENTER = approve all & next
+            if action == "" or action == " ":
                 for i in range(start_idx, end_idx):
                     state.approved_indices.add(i)
                     state.rejected_indices.discard(i)
-                self.console.print("[green]✓ All pairs approved[/green]")
+                if batch_index < total_batches - 1:
+                    batch_index += 1
+                    state.current_batch_index = batch_index
+                else:
+                    self.console.print("[yellow]Last batch - press 'q' to finish[/yellow]")
 
-            elif action == "d":
-                # Deny all in batch
+            elif action == "x":
+                # Reject all & next
                 for i in range(start_idx, end_idx):
                     state.rejected_indices.add(i)
                     state.approved_indices.discard(i)
-                self.console.print("[red]✗ All pairs rejected[/red]")
+                if batch_index < total_batches - 1:
+                    batch_index += 1
+                    state.current_batch_index = batch_index
 
-            elif action in [str(i) for i in range(1, 11)]:
+            elif action in ["1", "2", "3", "4"]:
                 # Toggle individual pair
                 pair_idx = int(action) - 1
                 global_idx = start_idx + pair_idx
@@ -392,14 +479,14 @@ class PairReviewer:
             elif action == "e":
                 self.edit_pair(pairs, batch_index, state)
 
-            elif action == "n":
+            elif action in ["n", "→"]:
                 if batch_index < total_batches - 1:
                     batch_index += 1
                     state.current_batch_index = batch_index
                 else:
                     self.console.print("[yellow]Already at last batch[/yellow]")
 
-            elif action == "p":
+            elif action in ["p", "←"]:
                 if batch_index > 0:
                     batch_index -= 1
                     state.current_batch_index = batch_index
@@ -410,7 +497,7 @@ class PairReviewer:
                 self.show_stats(len(pairs), state)
                 Prompt.ask("[dim]Press Enter to continue[/dim]")
 
-            elif action == "h":
+            elif action == "h" or action == "?":
                 continue
 
             elif action == "q":

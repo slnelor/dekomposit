@@ -80,6 +80,14 @@ LANGUAGE_PREFIXES = {
     "SK": "sk",
 }
 
+# Full language names for unambiguous prompts
+LANGUAGE_NAMES = {
+    "en": "English",
+    "ru": "Russian",
+    "uk": "Ukrainian",  # NOT "United Kingdom"!
+    "sk": "Slovak",
+}
+
 # All 12 ordered directions for 4 languages
 ALL_DIRECTIONS = [
     ("en", "ru"),
@@ -311,6 +319,15 @@ Requirements:
 - Vary length: short phrases (2-3 words) to longer sentences (15+ words)
 - Generate authentic, diverse content - not variations of the examples
 
+CRITICAL DIVERSITY REQUIREMENTS:
+- DO NOT repeat the same topics (parties, meetings, coffee, etc.)
+- VARY contexts: work, home, travel, shopping, sports, hobbies, relationships, technology, food, health, entertainment, etc.
+- VARY emotional tones: neutral, angry, happy, frustrated, excited, sad, sarcastic, playful, serious, etc.
+- DO NOT use the same sentence openings repeatedly (avoid "No way...", "Dude...", "I can't...", "What the..." patterns)
+- VARY sentence structures: statements, questions, exclamations, commands
+- AVOID repetitive patterns - each sentence should feel completely different from others
+- Think of DIVERSE real-life situations, not template variations
+
 Return as structured Translation data.""",
             },
         ]
@@ -393,66 +410,92 @@ Return as structured Translation data.""",
         # Create semaphore to limit concurrent requests
         semaphore = asyncio.Semaphore(max_concurrent)
 
-        async def generate_direction_with_limit(
+        async def generate_single_batch(
             from_lang: str,
             to_lang: str,
+            batch_num: int,
         ) -> list[Translation]:
-            """Generate all batches for one direction with concurrency control."""
+            """Generate a single batch with concurrency control."""
             direction_key = (from_lang, to_lang)
             direction_examples = self.examples.get(direction_key, [])
 
             if not direction_examples:
-                logger.warning(f"No examples found for {from_lang}→{to_lang}")
                 return []
 
-            direction_label = f"{from_lang.upper()} to {to_lang.upper()}"
-            all_pairs: list[Translation] = []
+            # Use FULL language names to avoid ambiguity (UK = Ukrainian, not British English!)
+            direction_label = f"{LANGUAGE_NAMES[from_lang]} to {LANGUAGE_NAMES[to_lang]}"
 
-            for batch_num in range(num_batches):
-                async with semaphore:
+            async with semaphore:
+                try:
                     pairs = await self._generate_batch(
                         direction_label, direction_examples, batch_size
                     )
 
-                    # Apply quality filters
+                    # Apply quality filters and save immediately
+                    filtered_pairs = []
                     for pair in pairs:
                         pair.from_lang = from_lang
                         pair.to_lang = to_lang
                         if self._filter_pair(pair):
-                            all_pairs.append(pair)
+                            filtered_pairs.append(pair)
 
-                    logger.debug(
-                        f"{direction_label} batch {batch_num+1}/{num_batches}: "
-                        f"generated {len(pairs)}, kept {len([p for p in pairs if self._filter_pair(p)])}"
-                    )
+                    # IMMEDIATE SAVE: Write to TSV after each batch
+                    if filtered_pairs:
+                        self.append_to_tsv(filtered_pairs, from_lang, to_lang)
 
-            return all_pairs
+                        # Show sample sentences for verification
+                        sample_sources = [(p.source or "")[:60] for p in filtered_pairs[:3]]  # First 3, max 60 chars
+                        samples_str = " | ".join(sample_sources)
 
-        # Build tasks for all directions
+                        logger.info(
+                            f"✅ {direction_label} batch {batch_num+1}/{num_batches}: "
+                            f"generated {len(pairs)}, kept {len(filtered_pairs)}, SAVED to TSV"
+                        )
+                        logger.info(f"   📝 Samples: {samples_str}")
+                        return filtered_pairs
+                    else:
+                        logger.warning(
+                            f"⚠️  {direction_label} batch {batch_num+1}/{num_batches}: "
+                            f"generated {len(pairs)} but ALL filtered out (quality issues)"
+                        )
+                        return []
+                except Exception as e:
+                    logger.error(f"Failed to generate batch for {direction_label}: {e}")
+                    return []
+
+        # Build tasks for ALL batches across ALL directions (true concurrency!)
+        logger.info(f"Creating tasks for {len(directions)} × {num_batches} = {len(directions) * num_batches} total batches")
         tasks: list[asyncio.Task[list[Translation]]] = []
-        for from_lang, to_lang in directions:
-            task = asyncio.create_task(
-                generate_direction_with_limit(from_lang, to_lang)
-            )
-            tasks.append(task)
 
-        # Execute all tasks concurrently
-        logger.info(f"Executing {len(tasks)} direction tasks concurrently...")
+        for from_lang, to_lang in directions:
+            direction_key = (from_lang, to_lang)
+            if direction_key not in self.examples:
+                logger.warning(f"No examples found for {from_lang}→{to_lang}, skipping")
+                continue
+
+            for batch_num in range(num_batches):
+                task = asyncio.create_task(
+                    generate_single_batch(from_lang, to_lang, batch_num)
+                )
+                tasks.append(task)
+
+        # Execute all batch tasks concurrently (true parallelism!)
+        logger.info(f"Executing {len(tasks)} batch tasks with {max_concurrent} concurrent workers...")
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Collect results
+        # Collect results from all batches
         all_pairs: list[Translation] = []
-        for i, result in enumerate(results):
-            from_lang, to_lang = directions[i]
+        error_count = 0
+        for result in results:
             if isinstance(result, BaseException):
-                logger.error(f"Direction {from_lang}→{to_lang} failed: {result}")
-            else:
+                error_count += 1
+            elif result:  # result is a list of pairs from one batch
                 all_pairs.extend(result)
-                logger.info(
-                    f"Direction {from_lang}→{to_lang}: generated {len(result)} pairs"
-                )
 
-        logger.info(f"Successfully generated {len(all_pairs)} total translation pairs")
+        logger.info(
+            f"✅ Generation complete: {len(all_pairs)} total pairs "
+            f"({error_count} batches failed)"
+        )
         return all_pairs
 
     def save(
@@ -541,6 +584,52 @@ Return as structured Translation data.""",
             logger.info(f"Saved {len(pairs)} pairs to AutoML TSV: {filepath}")
 
         return saved_files
+
+    def append_to_tsv(
+        self,
+        pairs: list[Translation],
+        from_lang: str,
+        to_lang: str,
+        output_dir: Path | None = None,
+    ) -> Path:
+        """Append translation pairs to AutoML TSV file immediately.
+
+        Creates file with header if it doesn't exist, otherwise appends.
+
+        Args:
+            pairs: List of Translation models to append
+            from_lang: Source language code
+            to_lang: Target language code
+            output_dir: Directory for TSV files (defaults to self.output_dir/automl)
+
+        Returns:
+            Path to the TSV file
+        """
+        output_dir = output_dir or self.output_dir / "automl"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        filename = f"{from_lang}-{to_lang}.tsv"
+        filepath = output_dir / filename
+
+        # Check if file exists to decide on header
+        file_exists = filepath.exists()
+
+        with open(filepath, "a", encoding="utf-8") as f:
+            # Write header if new file
+            if not file_exists:
+                f.write("source\ttarget\n")
+
+            # Append pairs
+            written_count = 0
+            for pair in pairs:
+                source = (pair.source or "").replace("\t", " ").replace("\n", " ")
+                target = (pair.translated or "").replace("\t", " ").replace("\n", " ")
+                if source and target:
+                    f.write(f"{source}\t{target}\n")
+                    written_count += 1
+
+        logger.debug(f"💾 Appended {written_count} pairs to: {filepath.name}")
+        return filepath
 
     @staticmethod
     def load(filepath: Path | str) -> list[Translation]:

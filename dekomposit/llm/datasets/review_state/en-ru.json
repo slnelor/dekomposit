@@ -1,0 +1,13 @@
+{
+  "approved": [
+    3
+  ],
+  "rejected": [],
+  "current_batch": 0,
+  "edited": {
+    "3": {
+      "source": "Dude, chill, it's not the end of the world, it's just a stupid exam retake.",
+      "target": "Да остынь ты, это не конец света, всего лишь тупая пересдача экзамена."
+    }
+  }
+}

@@ -12,7 +12,7 @@ DEFAULT_SERVER = "https://generativelanguage.googleapis.com/v1beta/openai/"
 CURRENT_API_KEY = os.getenv("CURRENT_API_KEY", "GEMINI_API_KEY")
 
 LLM_CONFIG = {
-    "temperature": float(os.getenv("LLM_TEMPERATURE", 0.2)),
+    "temperature": float(os.getenv("LLM_TEMPERATURE", 1.0)),  # Gemini only supports 1.0
     "max_tokens": int(os.getenv("LLM_MAX_TOKENS", 1024)),
     CURRENT_API_KEY: os.getenv(CURRENT_API_KEY),
 }
