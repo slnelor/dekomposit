@@ -26,7 +26,7 @@ language coach that users interact with conversationally. Key capabilities:
 - Send reminders and track streaks
 - Provide instant definitions, examples, and corrections
 
-The bot personality and behavior are defined in `dekomposit/llm/prompting/SOUL.md`.
+The bot personality and behavior are defined in `dekomposit/llm/base_prompts/SOUL.md`.
 
 ### Web Platform
 The web platform extends the Telegram experience with features that benefit

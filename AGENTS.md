@@ -11,7 +11,7 @@ This file provides guidance for agentic coding assistants working in the **dekom
 
 The core uses LLMs (OpenAI, Gemini) to provide personalized language learning experiences.
 
-- **Language**: Python 3.14
+- **Language**: Python 3.12
 - **Architecture**: Async-first with Pydantic models, OpenAI SDK with custom base URLs
 - **Telegram Bot**: aiogram (async framework)
 - **Web Stack**: FastAPI + PostgreSQL + SQLAlchemy + htmx frontend
@@ -213,7 +213,8 @@ def calculate_difficulty(word: str, user_level: str) -> int:
 
 ### Telegram Bot Design
 
-- Bot personality is defined in `dekomposit/llm/prompting/SOUL.md`
+- Bot personality is defined in `dekomposit/llm/base_prompts/SOUL.md`
+- Base prompt is the aggregation of `SOUL.md` + `MEMORY.md` via `Agent.get_base_prompts()`
 - Use aiogram's `Router` for organizing handlers
 - All handlers must be async
 - Use `Message.answer()` for responses, not `Bot.send_message()` when possible
@@ -248,8 +249,9 @@ dekomposit/
 ├── llm/
 │   ├── __init__.py        # Empty
 │   ├── base_client.py     # AsyncOpenAI wrapper (Client class)
-│   └── prompting/
-│       └── SOUL.md        # Bot personality definition
+│   └── base_prompts/
+│       ├── SOUL.md        # Bot personality definition
+│       └── MEMORY.md      # Session memory
 ├── bot/                   # (Planned) Telegram bot code
 │   ├── handlers/          # Message/command handlers
 │   ├── keyboards.py       # Inline keyboards
@@ -268,11 +270,25 @@ dekomposit/
 
 ### Updating bot personality
 
-Edit `dekomposit/llm/prompting/SOUL.md` to change the conversational tone and teaching approach.
+Edit `dekomposit/llm/base_prompts/SOUL.md` to change the conversational tone and teaching approach.
+
+### Adaptive Translation datasets (Cloud Translation)
+
+- Datasets are created and imported via the Cloud Translation API.
+- Supported dataset location: `us-central1` only.
+- Source TSVs live in `dekomposit/llm/datasets/automl/` and use `source<TAB>target` format.
+- Workflow: upload TSVs to GCS, create datasets per direction, import TSVs, then call `adaptiveMtTranslate` with the dataset name.
+- Tooling: `dekomposit/llm/tools/adaptive_translation.py` calls `adaptiveMtTranslate` using ADC or `GOOGLE_OAUTH_ACCESS_TOKEN`.
+- Environment: `GOOGLE_CLOUD_PROJECT`, `ADAPTIVE_MT_LOCATION`, `ADAPTIVE_MT_DATASET_ID`, `ADAPTIVE_MT_DATASET_NAME`, `GOOGLE_APPLICATION_CREDENTIALS`.
+
+### Agent tool routing
+
+- Entry point: `Agent.handle_message()` in `dekomposit/llm/agent.py`.
+- Tool selection: LLM returns a `ToolDecision` with `action`, `source_lang`, `target_lang`.
+- Translation: uses `AdaptiveTranslationTool` with dataset `adaptive-<src>-<tgt>`; if dataset is missing, returns `None`.
 
 ## References
 
 - Full tech requirements: `docs/tech_requirements.md`
-- Project context: `CLAUDE.md`
-- Bot personality: `dekomposit/llm/prompting/SOUL.md`
-- Python version: **3.14**
+- Bot personality: `dekomposit/llm/base_prompts/SOUL.md`
+- Python version: **3.12**

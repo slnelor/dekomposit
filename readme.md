@@ -83,7 +83,7 @@ dekomposit/
 ├── config.py              # Environment & LLM settings
 └── llm/
     ├── base_client.py     # AsyncOpenAI wrapper
-    └── prompting/
+    └── base_prompts/
         └── SOUL.md        # Bot personality definition
 ```
 

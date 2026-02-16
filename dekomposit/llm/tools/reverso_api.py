@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class ReversoAPI(BaseTool[dict[str, Any], dict[str, Any]]):
+class ReversoAPI(BaseTool):
     """Tool for interacting with Reverso Context API
 
     Provides translation and context examples using Reverso service.

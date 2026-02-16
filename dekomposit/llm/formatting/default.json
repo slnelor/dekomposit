@@ -1,0 +1,37 @@
+{
+  "active": "translation_default",
+  "presets": {
+    "translation_default": {
+      "name": "translation_default",
+      "description": "Default translation with language codes",
+      "open_tag": "<translation>",
+      "close_tag": "</translation>",
+      "template": "[{source} → {target}] {translation}",
+      "metadata": {}
+    },
+    "translation_minimal": {
+      "name": "translation_minimal",
+      "description": "Minimal wrapper without language codes",
+      "open_tag": "<translation>",
+      "close_tag": "</translation>",
+      "template": "{translation}",
+      "metadata": {}
+    },
+    "translation_brackets": {
+      "name": "translation_brackets",
+      "description": "Simple brackets",
+      "open_tag": "[",
+      "close_tag": "]",
+      "template": "{translation}",
+      "metadata": {}
+    },
+    "translation_verbose": {
+      "name": "translation_verbose",
+      "description": "Verbose format with source text",
+      "open_tag": "<translation>",
+      "close_tag": "</translation>",
+      "template": "From {source}: {original}\nTo {target}: {translation}",
+      "metadata": {}
+    }
+  }
+}

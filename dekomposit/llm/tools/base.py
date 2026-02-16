@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar
+from typing import Any
 import logging
 
 
@@ -10,10 +10,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-OutputT = TypeVar("OutputT")
-
-
-class BaseTool(ABC, Generic[OutputT]):
+class BaseTool(ABC):
     """Abstract base class for all tools
 
     Tools are callable objects that perform specific actions.
@@ -36,7 +33,7 @@ class BaseTool(ABC, Generic[OutputT]):
         logger.debug(f"Initialized tool: {self.name}")
 
     @abstractmethod
-    async def __call__(self, *args: Any, **kwargs: Any) -> OutputT:
+    async def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Execute the tool's main logic
 
         This method must be implemented by all concrete tool classes.

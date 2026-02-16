@@ -1,6 +1,28 @@
 from pydantic import BaseModel, Field
 
 
+class ToolDecision(BaseModel):
+    """LLM decision for routing user input."""
+
+    action: str = Field(description="translate or respond")
+    text: str = Field(description="Text to translate or respond to")
+    source_lang: str | None = Field(default=None, description="Source language code")
+    target_lang: str | None = Field(default=None, description="Target language code")
+
+
+class AgentResponse(BaseModel):
+    """Simple response payload for non-translation replies."""
+
+    message: str = Field(description="Response text")
+
+
+class LanguageDetection(BaseModel):
+    """LLM-detected language with confidence."""
+
+    language: str = Field(description="Language code: en, ru, uk, sk, or other")
+    confidence: str = Field(description="Confidence level: high, medium, low")
+
+
 class Translation(BaseModel):
     """Translation request/response model
 

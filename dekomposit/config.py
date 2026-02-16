@@ -4,8 +4,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 SECTION_PLACEHOLDER = "###"  # Add in the beginning of the section
-TRANSLATION_TAG_START = "<translation>"
-TRANSLATION_TAG_END = "</translation>"
 
 DEFAULT_LLM = "gemini-flash-lite-latest"
 DEFAULT_SERVER = "https://generativelanguage.googleapis.com/v1beta/openai/"
