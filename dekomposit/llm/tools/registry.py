@@ -76,21 +76,43 @@ class ToolRegistry:
         logger.debug(f"Registered factory: {name}")
 
     def get(self, name: str) -> BaseTool | None:
-        """Get a tool by name, creating it from factory if needed."""
+        """Get a tool by name, creating it from factory if needed.
+        
+        Args:
+            name: Tool name (can be registry key or tool.name)
+            
+        Returns:
+            Tool instance or None
+        """
+        # First try exact match
         if name in self._tools:
             return self._tools[name]
-
+        
         if name in self._tool_factories:
             factory = self._tool_factories[name]
             tool = factory() if callable(factory) and not isinstance(factory, type) else factory()
             self._tools[name] = tool
             return tool
-
+        
+        # Try matching by tool.name (for when LLM calls tool by its internal name)
+        for key, factory in self._tool_factories.items():
+            tool = factory() if callable(factory) and not isinstance(factory, type) else factory()
+            if tool.name == name:
+                self._tools[key] = tool
+                return tool
+        
         return None
 
     def has(self, name: str) -> bool:
         """Check if a tool exists."""
-        return name in self._tools or name in self._tool_factories
+        if name in self._tools or name in self._tool_factories:
+            return True
+        # Also check by tool.name
+        for key, factory in self._tool_factories.items():
+            tool = factory() if callable(factory) and not isinstance(factory, type) else factory()
+            if tool.name == name:
+                return True
+        return False
 
     def list_tools(self) -> list[str]:
         """List all available tool names."""
@@ -109,10 +131,7 @@ class ToolRegistry:
                     "function": {
                         "name": tool.name,
                         "description": tool.description,
-                        "parameters": {
-                            "type": "object",
-                            "properties": {},
-                        },
+                        "parameters": tool.get_schema(),
                     },
                 })
         

@@ -221,3 +221,28 @@ class AdaptiveTranslationTool(BaseTool):
         if not token:
             raise RuntimeError("gcloud returned an empty access token")
         return token
+
+    def get_schema(self) -> dict:
+        """Return OpenAI function calling schema."""
+        return {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "Text to translate"
+                },
+                "source_lang": {
+                    "type": "string",
+                    "description": "Source language code (en, ru, uk, sk)"
+                },
+                "target_lang": {
+                    "type": "string",
+                    "description": "Target language code (en, ru, uk, sk)"
+                },
+                "dataset_id": {
+                    "type": "string",
+                    "description": "Adaptive MT dataset ID (e.g., adaptive-en-ru)"
+                },
+            },
+            "required": ["text", "source_lang", "target_lang"],
+        }

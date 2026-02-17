@@ -41,3 +41,11 @@ class Translation(BaseModel):
     to_lang: str | None = Field(
         None, description="Target language code (e.g., 'en', 'es', 'fr')"
     )
+
+
+class ToolCallResult(BaseModel):
+    """Result of a tool call in the agentic loop."""
+
+    tool_name: str = Field(description="Name of the tool that was called")
+    arguments: dict = Field(description="Arguments passed to the tool")
+    result: dict = Field(description="Result returned by the tool")

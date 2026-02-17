@@ -1,3 +1,4 @@
+import json
 import logging
 import httpx
 from pathlib import Path
@@ -6,9 +7,9 @@ from typing import Any, AsyncGenerator, cast
 from dekomposit.llm.base_client import Client
 from dekomposit.llm.types import AgentResponse, ToolDecision, LanguageDetection
 from dekomposit.llm.tools.registry import ToolRegistry
-from dekomposit.llm.tools.memory_tool import MemoryTool
 from dekomposit.llm.formatting import FormatRegistry
 from dekomposit.llm.memory import UserMemory
+from dekomposit.llm.prompts import PromptRegistry
 
 
 logging.basicConfig(
@@ -40,19 +41,153 @@ class Agent:
         self.custom_personality: dict[str, str] = {}
         self.registry = ToolRegistry(auto_discover=True)
         self.formats = FormatRegistry()
+        self.prompts = PromptRegistry()
         self.user_id = user_id
         self.memory = UserMemory(user_id=user_id)
         self._load_memory()
         self.base_prompts = self._load_base_prompts()
         self.base_prompt = self._build_base_prompt(self.base_prompts)
         self.routing_prompt = self._build_routing_prompt()
-        self.detection_prompt = self.base_prompts.get("detection.md", "")
-        
-        self.memory_tool = MemoryTool(agent=self)
-        self.registry.register(self.memory_tool)
+        self.detection_prompt = self.prompts.get("detection") or ""
 
         logger.info(f"Agent initialized with model: {self.client.model}")
         logger.info(f"Available tools: {self.registry.list_tools()}")
+        logger.info(f"Tool schemas: {len(self.registry.get_tool_schemas())} available")
+
+    async def execute_tools(self, text: str, max_iterations: int = 5) -> dict[str, Any]:
+        """Main agentic loop: LLM decides tools → executes → observes → repeats.
+        
+        This is the core of the agentic architecture - the LLM sees tool results
+        and decides what to do next.
+        
+        Args:
+            text: User input text
+            max_iterations: Maximum number of loop iterations
+            
+        Returns:
+            Dict with type and message/tool_calls
+        """
+        messages: list[dict] = [
+            {"role": "system", "content": self.base_prompt}
+        ]
+        messages.append({"role": "user", "content": text})
+        
+        tool_call_history: list[dict] = []
+        
+        for iteration in range(max_iterations):
+            logger.debug(f"Agent loop iteration {iteration + 1}/{max_iterations}")
+            
+            # Get available tools
+            tools = self.registry.get_tool_schemas()
+            
+            # LLM decides what to do
+            response = await self.client.request_with_tools(
+                messages=messages,
+                tools=tools if tools else None,
+            )
+            
+            message = response.choices[0].message
+            
+            # Debug: log the message details
+            logger.debug(f"Message content: {message.content}")
+            logger.debug(f"Message tool_calls: {message.tool_calls}")
+            
+            # Check for tool calls
+            tool_calls = message.tool_calls
+            
+            # Handle case where tool_calls is None or empty
+            if not tool_calls:
+                # No tool calls - LLM has final response
+                final_message = message.content or ""
+                logger.debug(f"Agent loop complete: {final_message[:100]}...")
+                return {
+                    "type": "response",
+                    "message": final_message,
+                    "tool_calls": tool_call_history,
+                }
+            
+            # Fix for Gemini: add content if empty when tool_calls present
+            if not message.content:
+                message.content = "[TOOL CALL]"
+            
+            logger.info(f"LLM requested {len(tool_calls)} tool call(s)")
+            
+            # Debug: print messages count
+            logger.debug(f"Messages before adding assistant: {len(messages)}")
+            
+            # IMPORTANT: Add assistant message with tool_calls to messages
+            # This is required for the model to know which tool calls we're responding to
+            assistant_message = {
+                "role": "assistant",
+                "content": message.content,
+                "tool_calls": [
+                    {
+                        "id": tc.id if tc.id else tc.function.name,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        }
+                    }
+                    for tc in tool_calls
+                ]
+            }
+            messages.append(assistant_message)
+            logger.debug(f"Messages after adding assistant: {len(messages)}")
+            
+            # Execute each tool call
+            for tc in tool_calls:
+                tool_name = tc.function.name
+                
+                # Fix for Gemini: use function name as fallback if id is empty
+                tool_call_id = tc.id if tc.id else tool_name
+                
+                try:
+                    tool_args = json.loads(tc.function.arguments)
+                except json.JSONDecodeError:
+                    tool_args = {}
+                
+                logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
+                
+                # Get and execute tool
+                tool = self.registry.get(tool_name)
+                if tool is None:
+                    logger.warning(f"Tool not found: {tool_name}")
+                    tool_result = {"error": f"Tool not found: {tool_name}"}
+                else:
+                    try:
+                        tool_result = await tool(**tool_args)
+                    except Exception as e:
+                        logger.error(f"Tool execution failed: {e}")
+                        tool_result = {"error": str(e)}
+                
+                # Add tool result to messages (LLM sees it!)
+                # Include name for Gemini compatibility
+                tool_message = {
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": json.dumps(tool_result),
+                }
+                
+                messages.append(tool_message)
+                
+                # Track for history
+                tool_call_history.append({
+                    "tool_name": tool_name,
+                    "arguments": tool_args,
+                    "result": tool_result,
+                })
+                
+                logger.debug(f"Tool result: {tool_result}")
+            
+            # Loop continues - LLM sees tool results and decides next action
+        
+        logger.warning("Max iterations reached in agent loop")
+        return {
+            "type": "error",
+            "message": "Maximum iterations reached",
+            "tool_calls": tool_call_history,
+        }
 
     def _load_memory(self) -> None:
         """Load user memory from storage. Currently a stub - returns defaults."""
@@ -144,34 +279,35 @@ class Agent:
         return "\n".join(lines)
 
     def _build_routing_prompt(self) -> str:
-        """Build dynamic routing prompt based on available tools."""
+        """Build dynamic routing prompt from prompts registry."""
         tool_names = self.registry.list_tools()
         tool_list = ", ".join(tool_names) if tool_names else "none"
         
-        return (
-            "You are a routing assistant. Decide whether the user wants a translation. "
-            f"Available tools: {tool_list}. "
-            "Return action='translate' if the user asks to translate, provides text to translate, "
-            "or explicitly requests a language change. Otherwise return action='respond'. "
-            "When action='translate', ALWAYS fill source_lang and target_lang using language codes "
-            "(en, ru, uk, sk), Note that uk means ukrainian. If the source or target is unclear, infer it from the text."
-        )
+        routing_template = self.prompts.get("routing")
+        if routing_template:
+            return routing_template.format(tools=tool_list)
+        
+        # Fallback - should not happen if prompt file exists
+        return f"You are a routing assistant. Available tools: {tool_list}. Decide action."
 
     async def handle_message(self, text: str) -> dict[str, Any] | None:
-        """Route a user message through tool selection and response formatting."""
+        """Route a user message through tool selection and response formatting.
+        
+        Uses agentic loop - LLM decides tools, executes them, observes results,
+        and continues until final response.
+        """
         self.memory.add_message("user", text)
         
-        decision = await self._decide_action(text)
-
-        if decision.action == "translate":
-            result = await self._handle_translation(decision)
-            if result:
-                self._update_memory_on_translation(decision, result)
-            return result
-
-        result = await self._handle_response(decision)
-        if result:
-            self._update_memory_on_response(decision, result)
+        # Use agentic loop - LLM decides what tools to use
+        result = await self.execute_tools(text)
+        
+        if result.get("type") == "response":
+            # Update memory with the interaction
+            message = result.get("message", "")
+            if message:
+                self.memory.add_message("assistant", message)
+                self._rebuild_base_prompt()
+        
         return result
 
     async def chat(self, text: str) -> str:

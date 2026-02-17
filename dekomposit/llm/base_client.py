@@ -1,6 +1,7 @@
 import os
 import logging
 from functools import lru_cache
+from typing import AsyncGenerator
 
 from openai import AsyncOpenAI
 from pydantic import BaseModel
@@ -44,6 +45,7 @@ class Client:
         return_format: type[BaseModel],
         model: str | None = None,
         temperature: float | None = None,
+        timeout: float = 30.0,
     ):
         """A method wrapper around openai.chat.completions.parse"""
         model = model or self.model
@@ -54,6 +56,7 @@ class Client:
             messages=messages,
             response_format=return_format,
             temperature=temperature,
+            timeout=timeout,
         )
 
         usage = response.usage
@@ -63,3 +66,65 @@ class Client:
         )
 
         return response
+
+    async def request_with_tools(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+        model: str | None = None,
+        temperature: float | None = None,
+        timeout: float = 30.0,
+    ):
+        """A method wrapper around openai.chat.completions with tool calling.
+        
+        Args:
+            messages: Chat messages
+            tools: OpenAI tool definitions
+            model: Model to use
+            temperature: Sampling temperature
+            timeout: Request timeout
+            
+        Returns:
+            ChatCompletion response with tool_calls
+        """
+        model = model or self.model
+        temperature = temperature if temperature is not None else LLM_CONFIG["temperature"]
+
+        response = await self.client().chat.completions.create(
+            model=model,
+            messages=messages,
+            tools=tools,
+            temperature=temperature,
+            timeout=timeout,
+        )
+
+        usage = response.usage
+        logger.info(
+            f"LLMCALL {response.id}\tTOKENS USED: {usage.prompt_tokens} (input); "
+            f"{usage.completion_tokens} (output); {usage.total_tokens} (total)"
+        )
+
+        return response
+
+    async def stream(
+        self,
+        messages: list[dict],
+        model: str | None = None,
+        temperature: float | None = None,
+        timeout: float = 30.0,
+    ) -> AsyncGenerator[str, None]:
+        """Stream chat completions without structured output."""
+        model = model or self.model
+        temperature = temperature if temperature is not None else LLM_CONFIG["temperature"]
+
+        stream = await self.client().chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            stream=True,
+            timeout=timeout,
+        )
+
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content

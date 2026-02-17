@@ -1,7 +1,6 @@
 # Language Detection Prompt
 
 Detect the language of the following text. Return only the language code:
-
 - en - English
 - ru - Russian
 - uk - Ukrainian

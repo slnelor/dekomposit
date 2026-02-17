@@ -73,3 +73,17 @@ class BaseTool(ABC):
     def __str__(self) -> str:
         """Human-readable string representation"""
         return f"{self.name}: {self.description}"
+
+    def get_schema(self) -> dict[str, Any]:
+        """Return OpenAI function calling schema for this tool.
+        
+        Override this in subclasses to define custom parameters.
+        
+        Returns:
+            JSON Schema dict for tool parameters
+        """
+        return {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        }
