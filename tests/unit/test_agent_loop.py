@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
@@ -17,9 +18,14 @@ class EchoTool(BaseTool):
 
 
 class FakeClient:
-    def __init__(self, responses: list[SimpleNamespace]) -> None:
+    def __init__(
+        self,
+        responses: list[SimpleNamespace],
+        stream_chunks: list[str] | None = None,
+    ) -> None:
         self._responses = responses
         self._index = 0
+        self._stream_chunks = stream_chunks or ["stream-ok"]
 
     async def request_with_tools(self, messages, tools=None):
         if self._index >= len(self._responses):
@@ -28,13 +34,29 @@ class FakeClient:
         self._index += 1
         return response
 
+    async def request(self, messages, return_format, **kwargs):
+        text = messages[-1]["content"]
+        decision = SimpleNamespace(
+            action="respond",
+            text=text,
+            source_lang=None,
+            target_lang=None,
+        )
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(parsed=decision))]
+        )
+
+    async def stream(self, messages, **kwargs):
+        for chunk in self._stream_chunks:
+            yield chunk
+
 
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_handle_message_returns_direct_response() -> None:
     agent = Agent(user_id=1)
     agent.registry.clear()
-    agent.client = FakeClient([make_chat_response("Hi there", [])])
+    agent.client = cast(Any, FakeClient([make_chat_response("Hi there", [])]))
 
     result = await agent.handle_message("hello")
 
@@ -54,11 +76,14 @@ async def test_handle_message_executes_tool_and_continues_loop() -> None:
     agent.registry.register(EchoTool())
 
     tool_call = make_tool_call("echo_tool", '{"text": "ping"}', "echo_1")
-    agent.client = FakeClient(
-        [
-            make_chat_response("[TOOL CALL]", [tool_call]),
-            make_chat_response("Tool completed", []),
-        ]
+    agent.client = cast(
+        Any,
+        FakeClient(
+            [
+                make_chat_response("[TOOL CALL]", [tool_call]),
+                make_chat_response("Tool completed", []),
+            ]
+        ),
     )
 
     result = await agent.handle_message("use tool")
@@ -79,11 +104,14 @@ async def test_handle_message_handles_unknown_tool_gracefully() -> None:
     agent.registry.clear()
 
     tool_call = make_tool_call("missing_tool", '{"x": 1}', "missing_1")
-    agent.client = FakeClient(
-        [
-            make_chat_response("[TOOL CALL]", [tool_call]),
-            make_chat_response("Recovered", []),
-        ]
+    agent.client = cast(
+        Any,
+        FakeClient(
+            [
+                make_chat_response("[TOOL CALL]", [tool_call]),
+                make_chat_response("Recovered", []),
+            ]
+        ),
     )
 
     result = await agent.handle_message("trigger")
@@ -102,11 +130,14 @@ async def test_execute_tools_respects_max_iterations() -> None:
     agent.registry.register(EchoTool())
 
     tool_call = make_tool_call("echo_tool", '{"text": "loop"}', "loop_1")
-    agent.client = FakeClient(
-        [
-            make_chat_response("[TOOL CALL]", [tool_call]),
-            make_chat_response("[TOOL CALL]", [tool_call]),
-        ]
+    agent.client = cast(
+        Any,
+        FakeClient(
+            [
+                make_chat_response("[TOOL CALL]", [tool_call]),
+                make_chat_response("[TOOL CALL]", [tool_call]),
+            ]
+        ),
     )
 
     result = await agent.execute_tools("loop", max_iterations=2)
@@ -121,7 +152,7 @@ async def test_execute_tools_respects_max_iterations() -> None:
 async def test_stream_chat_yields_response() -> None:
     agent = Agent(user_id=5)
     agent.registry.clear()
-    agent.client = FakeClient([make_chat_response("stream-ok", [])])
+    agent.client = cast(Any, FakeClient([make_chat_response("stream-ok", [])]))
 
     chunks = [chunk async for chunk in agent.stream_chat("hello")]
 
