@@ -4,29 +4,29 @@ from dekomposit.llm.memory import UserMemory
 
 
 @pytest.mark.unit
-def test_user_memory_add_topic_deduplicates_case_insensitive() -> None:
-    memory = UserMemory(user_id=100)
+def test_user_memory_add_note_deduplicates_case_insensitive() -> None:
+    memory = UserMemory()
 
-    memory.add_topic("Movies")
-    memory.add_topic("movies")
+    memory.add_note("Likes movies")
+    memory.add_note("likes movies")
 
-    assert memory.topics == ["Movies"]
+    assert memory.notes == ["Likes movies"]
 
 
 @pytest.mark.unit
-def test_user_memory_add_mistake_promotes_learning_gap_at_threshold() -> None:
-    memory = UserMemory(user_id=101)
+def test_user_memory_remove_note_returns_true_when_found() -> None:
+    memory = UserMemory()
+    memory.add_note("Prefers short responses")
 
-    for _ in range(5):
-        memory.add_mistake("verb_conjugation")
+    removed = memory.remove_note("prefers short responses")
 
-    assert memory.mistake_count["verb_conjugation"] == 5
-    assert "verb_conjugation" in memory.learning_gaps
+    assert removed is True
+    assert memory.notes == []
 
 
 @pytest.mark.unit
 def test_user_memory_history_keeps_last_50_messages() -> None:
-    memory = UserMemory(user_id=102)
+    memory = UserMemory()
 
     for i in range(60):
         memory.add_message("user", f"m{i}")

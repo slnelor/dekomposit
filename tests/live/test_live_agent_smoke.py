@@ -16,7 +16,7 @@ pytestmark = [
 
 @pytest.mark.asyncio
 async def test_live_agent_chat_returns_non_empty_response() -> None:
-    agent = Agent(user_id=9001)
+    agent = Agent()
 
     reply = await agent.chat("Reply with exactly one short greeting in English.")
 

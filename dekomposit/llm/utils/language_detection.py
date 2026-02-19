@@ -7,19 +7,23 @@ def detect_language_local(text: str) -> str | None:
         return None
 
     lowered = text.lower()
-    
+
     # Check for Cyrillic
     if re.search(r"[\u0400-\u04ff]", lowered):
         # Ukrainian-specific characters (і, ї, є, ґ)
-        has_uk_markers = any(ch in lowered for ch in ("\u0456", "\u0457", "\u0454", "\u0491"))
+        has_uk_markers = any(
+            ch in lowered for ch in ("\u0456", "\u0457", "\u0454", "\u0491")
+        )
         if has_uk_markers:
             return "uk"
-        
+
         # Russian-specific characters (ъ, ы, э, ё)
-        has_ru_markers = any(ch in lowered for ch in ("\u044a", "\u044b", "\u044d", "\u0451"))
+        has_ru_markers = any(
+            ch in lowered for ch in ("\u044a", "\u044b", "\u044d", "\u0451")
+        )
         if has_ru_markers:
             return "ru"
-        
+
         # If has Cyrillic but neither uk nor ru specific chars
         # Default to Ukrainian (more common in this context for the app)
         return "uk"

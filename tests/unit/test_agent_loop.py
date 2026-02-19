@@ -54,7 +54,7 @@ class FakeClient:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_handle_message_returns_direct_response() -> None:
-    agent = Agent(user_id=1)
+    agent = Agent()
     agent.registry.clear()
     agent.client = cast(Any, FakeClient([make_chat_response("Hi there", [])]))
 
@@ -71,7 +71,7 @@ async def test_handle_message_returns_direct_response() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_handle_message_executes_tool_and_continues_loop() -> None:
-    agent = Agent(user_id=2)
+    agent = Agent()
     agent.registry.clear()
     agent.registry.register(EchoTool())
 
@@ -100,7 +100,7 @@ async def test_handle_message_executes_tool_and_continues_loop() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_handle_message_handles_unknown_tool_gracefully() -> None:
-    agent = Agent(user_id=3)
+    agent = Agent()
     agent.registry.clear()
 
     tool_call = make_tool_call("missing_tool", '{"x": 1}', "missing_1")
@@ -125,7 +125,7 @@ async def test_handle_message_handles_unknown_tool_gracefully() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_execute_tools_respects_max_iterations() -> None:
-    agent = Agent(user_id=4)
+    agent = Agent()
     agent.registry.clear()
     agent.registry.register(EchoTool())
 
@@ -149,11 +149,11 @@ async def test_execute_tools_respects_max_iterations() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_stream_chat_yields_response() -> None:
-    agent = Agent(user_id=5)
+async def test_chat_returns_rendered_response() -> None:
+    agent = Agent()
     agent.registry.clear()
     agent.client = cast(Any, FakeClient([make_chat_response("stream-ok", [])]))
 
-    chunks = [chunk async for chunk in agent.stream_chat("hello")]
+    message = await agent.chat("hello")
 
-    assert chunks == ["stream-ok"]
+    assert message == "stream-ok"

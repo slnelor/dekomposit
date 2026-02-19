@@ -85,9 +85,6 @@ GEMINI_MODELS = [
     "gemini-1.5-pro",
 ]
 
-OPENAI_SERVER = "https://api.openai.com/v1"
-OPENROUTER_SERVER = "https://openrouter.ai/api/v1"
-
 # Global flag for graceful shutdown
 _shutdown_requested = False
 
@@ -96,23 +93,25 @@ _shutdown_requested = False
 class ModelChoice:
     provider: str
     model: str
-    server: str
     api_key_env: str
 
 
 def setup_signal_handlers(cli_instance: "DatasetGeneratorCLI") -> None:
     """Setup signal handlers for graceful shutdown.
-    
+
     Uses a flag-based approach to avoid blocking I/O in signal handler context.
     The CLI checks this flag periodically and prompts the user at safe points.
     """
+
     def signal_handler(signum, frame):
         global _shutdown_requested
         sig_name = signal.Signals(signum).name
         # Use simple print to avoid rich console issues in signal context
-        print(f"\n[SIGNAL] Received {sig_name} - will prompt for confirmation at next safe point...")
+        print(
+            f"\n[SIGNAL] Received {sig_name} - will prompt for confirmation at next safe point..."
+        )
         _shutdown_requested = True
-    
+
     signal.signal(signal.SIGINT, signal_handler)  # Ctrl+C
     signal.signal(signal.SIGTERM, signal_handler)  # kill command
     # Note: Ctrl+Z (SIGTSTP) suspends the process - we can't intercept it easily
@@ -127,7 +126,7 @@ class DatasetGeneratorCLI:
 
     def run(self) -> None:
         setup_signal_handlers(self)
-        
+
         self.console.clear()
         self.console.print(
             Panel.fit(
@@ -145,7 +144,9 @@ class DatasetGeneratorCLI:
             self.console.print(
                 f"[yellow]Found existing data:[/yellow] {sum(existing_counts.values())} total pairs"
             )
-            table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED)
+            table = Table(
+                show_header=True, header_style="bold magenta", box=box.ROUNDED
+            )
             table.add_column("Direction")
             table.add_column("Current", justify="right")
 
@@ -161,9 +162,7 @@ class DatasetGeneratorCLI:
             self.console.print()
 
             if not Confirm.ask("Resume and append to existing data?", default=True):
-                if Confirm.ask(
-                    "Delete existing data and start fresh?", default=False
-                ):
+                if Confirm.ask("Delete existing data and start fresh?", default=False):
                     self.delete_existing_data()
                     existing_counts = {}
                 else:
@@ -193,7 +192,6 @@ class DatasetGeneratorCLI:
         summary = Table(box=box.SIMPLE, show_header=False)
         summary.add_row("Model", model_choice.model)
         summary.add_row("Provider", model_choice.provider)
-        summary.add_row("Server", model_choice.server)
         summary.add_row("Directions", str(len(directions)))
 
         if any(existing_counts.values()):
@@ -256,17 +254,19 @@ class DatasetGeneratorCLI:
         """Save current progress to files."""
         if not self._current_pairs:
             return
-        
+
         try:
             from dekomposit.llm.datasets.translation_data_gen import (
                 TranslationDataGenerator,
             )
-            
+
             generator = TranslationDataGenerator()
             generator.save(self._current_pairs, "synthetic_translations_all.json")
             generator.save_automl_tsv(self._current_pairs, split_by_direction=True)
-            
-            self.console.print(f"[green]Progress saved: {len(self._current_pairs)} pairs[/green]")
+
+            self.console.print(
+                f"[green]Progress saved: {len(self._current_pairs)} pairs[/green]"
+            )
         except Exception as e:
             logger.error(f"Failed to save progress: {e}")
             self.console.print(f"[red]Warning: Could not save progress: {e}[/red]")
@@ -309,19 +309,15 @@ class DatasetGeneratorCLI:
             return ModelChoice(
                 provider="openrouter",
                 model=model,
-                server=OPENROUTER_SERVER,
                 api_key_env="OPENROUTER_API_KEY",
             )
 
         provider, model = options[int(selection) - 1]
 
-        if openrouter_key and Confirm.ask(
-            "Route through OpenRouter?", default=False
-        ):
+        if openrouter_key and Confirm.ask("Route through OpenRouter?", default=False):
             return ModelChoice(
                 provider="openrouter",
                 model=model,
-                server=OPENROUTER_SERVER,
                 api_key_env="OPENROUTER_API_KEY",
             )
 
@@ -329,16 +325,12 @@ class DatasetGeneratorCLI:
             return ModelChoice(
                 provider="openai",
                 model=model,
-                server=OPENAI_SERVER,
                 api_key_env="OPENAI_API_KEY",
             )
-
-        from dekomposit.config import DEFAULT_SERVER
 
         return ModelChoice(
             provider="gemini",
             model=model,
-            server=DEFAULT_SERVER,
             api_key_env="GEMINI_API_KEY",
         )
 
@@ -450,8 +442,8 @@ class DatasetGeneratorCLI:
             )
             return
 
-        os.environ["LLM_MODEL"] = model_choice.model
-        os.environ["LLM_SERVER"] = model_choice.server
+        os.environ["CURRENT_LLM"] = model_choice.model
+        os.environ["CURRENT_PROVIDER"] = model_choice.provider
         os.environ["CURRENT_API_KEY"] = model_choice.api_key_env
 
         import dekomposit.config as config
@@ -466,7 +458,7 @@ class DatasetGeneratorCLI:
 
         async def runner() -> None:
             global _shutdown_requested
-            
+
             generator = TranslationDataGenerator()
 
             existing_pairs = []
@@ -474,13 +466,13 @@ class DatasetGeneratorCLI:
                 existing_pairs = self.load_existing_pairs()
 
             all_new_pairs: list = []
-            
+
             try:
                 for direction in directions:
                     global _shutdown_requested
                     if _shutdown_requested:
                         break
-                    
+
                     current_count = existing_counts.get(direction, 0)
                     needed = max(0, target_per_direction - current_count)
 
@@ -546,26 +538,28 @@ class DatasetGeneratorCLI:
         direction: tuple[str, str],
     ) -> list:
         """Generate pairs with retry logic for network errors.
-        
+
         Retries indefinitely for network errors with exponential backoff up to 5 minutes.
         Handles internet outages lasting 20+ minutes gracefully.
         User can interrupt at any time with Ctrl+C.
         """
         global _shutdown_requested
-        
+
         import time
-        
+
         attempt = 0
         retry_delay = 5  # seconds
         max_delay = 300  # 5 minutes max between retries
         total_wait_time = 0
         start_time = time.time()
-        
+
         while True:
             if _shutdown_requested:
-                self.console.print(f"[yellow]Shutdown requested for {direction[0]}->{direction[1]}, stopping...[/yellow]")
+                self.console.print(
+                    f"[yellow]Shutdown requested for {direction[0]}->{direction[1]}, stopping...[/yellow]"
+                )
                 return []
-            
+
             try:
                 attempt += 1
                 pairs = await generator.generate(
@@ -574,7 +568,7 @@ class DatasetGeneratorCLI:
                     max_concurrent=max_concurrent,
                     directions=[direction],
                 )
-                
+
                 # Success! Reset counters for next direction
                 if attempt > 1:
                     elapsed = time.time() - start_time
@@ -582,41 +576,46 @@ class DatasetGeneratorCLI:
                         f"[green]✓ Success after {attempt} attempts ({elapsed:.0f}s) for {direction[0]}->{direction[1]}[/green]"
                     )
                 return pairs
-                
-            except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError, 
-                    httpx.ReadTimeout, httpx.WriteTimeout, httpx.PoolTimeout) as e:
-                
+
+            except (
+                httpx.ConnectError,
+                httpx.TimeoutException,
+                httpx.NetworkError,
+                httpx.ReadTimeout,
+                httpx.WriteTimeout,
+                httpx.PoolTimeout,
+            ) as e:
                 elapsed = time.time() - start_time
-                
+
                 self.console.print(
                     f"[yellow]Network error for {direction[0]}->{direction[1]}: {type(e).__name__}[/yellow]"
                 )
                 self.console.print(
                     f"[yellow]Attempt {attempt} | Waiting {retry_delay}s before retry (total downtime: {elapsed:.0f}s)[/yellow]"
                 )
-                
+
                 # Wait with periodic checks for shutdown signal
                 waited = 0
                 check_interval = 1  # Check every second
                 while waited < retry_delay and not _shutdown_requested:
                     await asyncio.sleep(min(check_interval, retry_delay - waited))
                     waited += check_interval
-                
+
                 if _shutdown_requested:
                     return []
-                
+
                 # Exponential backoff: 5s, 10s, 20s, 40s, 60s, 120s, 180s, 240s, 300s, 300s...
                 retry_delay = min(retry_delay * 2, max_delay)
                 total_wait_time += retry_delay
-                
+
                 # After 20 minutes of waiting, auto-skip this direction
                 # (User may not be present to respond to prompts)
                 if elapsed > 1200:  # 20 minutes
                     self.console.print(
-                        f"[yellow]Network down for {elapsed/60:.0f}min, auto-skipping {direction[0]}->{direction[1]}[/yellow]"
+                        f"[yellow]Network down for {elapsed / 60:.0f}min, auto-skipping {direction[0]}->{direction[1]}[/yellow]"
                     )
                     return []
-                        
+
             except Exception as e:
                 # Non-network errors - log and return
                 self.console.print(

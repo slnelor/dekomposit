@@ -2,17 +2,12 @@ import logging
 from pathlib import Path
 
 
-logging.basicConfig(
-    datefmt="%d/%m/%Y %H:%M",
-    format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s",
-)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 class PromptRegistry:
     """Registry for loading prompts from files.
-    
+
     Auto-discovers .md files from prompts/ directory.
     Supports subdirectories for organization.
     """
@@ -31,7 +26,7 @@ class PromptRegistry:
         for md_file in self._prompts_dir.rglob("*.md"):
             relative_path = md_file.relative_to(self._prompts_dir)
             prompt_name = str(relative_path.with_suffix("")).replace("/", ".")
-            
+
             try:
                 with open(md_file, "r", encoding="utf-8") as f:
                     self._prompts[prompt_name] = f.read()
@@ -43,10 +38,10 @@ class PromptRegistry:
 
     def get(self, name: str) -> str | None:
         """Get a prompt by name.
-        
+
         Args:
             name: Prompt name (e.g., "routing", "detection", "translation.summarize")
-            
+
         Returns:
             Prompt content or None if not found
         """

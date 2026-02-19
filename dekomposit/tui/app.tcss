@@ -1,0 +1,147 @@
+Screen {
+    background: #11141d;
+    color: #e7e3ce;
+}
+
+#root {
+    layout: vertical;
+    width: 100%;
+    height: 100%;
+    padding: 1 2 0 2;
+}
+
+#topbar {
+    height: 2;
+    border-bottom: solid #34382e;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+
+#brand {
+    width: 1fr;
+    content-align: left middle;
+    color: #888d77;
+    text-style: bold;
+}
+
+#chips {
+    width: auto;
+}
+
+.chip {
+    width: auto;
+    margin-left: 2;
+    padding: 0 1;
+    color: #b8bf91;
+    background: #161b27;
+}
+
+#transcript-shell {
+    height: 1fr;
+}
+
+#messages {
+    height: 100%;
+    overflow-y: auto;
+    padding: 0 1 1 1;
+}
+
+.bubble {
+    width: 100%;
+    margin: 0;
+    padding: 1 2;
+    border-bottom: solid #34382e;
+    background: transparent;
+    color: #e7e3ce;
+}
+
+.role-user {
+    margin: 0 1;
+    border-left: tall #666c57;
+    border-right: tall #666c57;
+    background: #181c27;
+    color: #efe9d4;
+}
+
+.role-assistant {
+    margin: 0;
+}
+
+.role-system {
+    width: 100%;
+    margin: 0;
+    padding: 0 1;
+    border: none;
+    background: transparent;
+    color: #8f9679;
+    text-style: italic;
+}
+
+.kind-translated {
+    border-left: tall #99a56a;
+    background: #171d22;
+    color: #d2dba6;
+}
+
+.kind-error {
+    border-left: tall #af6d5f;
+    background: #251c20;
+    color: #efc4bb;
+}
+
+.kind-info {
+    color: #a6ad88;
+}
+
+#composer {
+    height: 3;
+    margin-top: 1;
+    border-top: solid #34382e;
+    border-bottom: solid #34382e;
+    background: #111620;
+    padding: 0 1;
+}
+
+#chat-input {
+    height: 1;
+    width: 100%;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #efe8cf;
+}
+
+#chat-input:focus {
+    border: none;
+    background: transparent;
+}
+
+#chat-input > .input--placeholder,
+#chat-input > .input--suggestion {
+    color: #69705d;
+}
+
+#chat-input > .input--cursor {
+    background: #d6cfb0;
+    color: #121722;
+    text-style: bold;
+}
+
+#chat-input > .input--selection {
+    background: #4a503e;
+}
+
+#footer-bar {
+    height: 2;
+    padding: 0 1;
+}
+
+#status-line {
+    width: 1fr;
+    color: #8f9679;
+}
+
+#hint-line {
+    width: auto;
+    color: #7f866d;
+}

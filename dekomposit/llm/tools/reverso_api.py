@@ -4,12 +4,7 @@ from typing import Any
 from dekomposit.llm.tools.base import BaseTool
 
 
-logging.basicConfig(
-    datefmt="%d/%m/%Y %H:%M",
-    format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s",
-)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 class ReversoAPI(BaseTool):
@@ -23,6 +18,7 @@ class ReversoAPI(BaseTool):
         super().__init__(
             name="reverso_api",
             description="Get translations and context examples from Reverso Context",
+            enabled=False,
         )
 
     async def __call__(
@@ -46,10 +42,11 @@ class ReversoAPI(BaseTool):
         Raises:
             NotImplementedError: This is a skeleton implementation
         """
-        logger.info(f"Reverso API call: {source_lang} -> {target_lang}")
-
-        # TODO: Implement actual Reverso API integration
-        raise NotImplementedError("Reverso API integration not yet implemented")
+        logger.info("Reverso API call attempted: %s -> %s", source_lang, target_lang)
+        return {
+            "status": "unavailable",
+            "message": "reverso_api is disabled until the integration is implemented",
+        }
 
     def validate_input(
         self, text: str, source_lang: str, target_lang: str, **kwargs: Any
@@ -72,6 +69,8 @@ class ReversoAPI(BaseTool):
         if not source_lang or not target_lang:
             logger.error("Language codes are required")
             return False
-        # TODO: Check for url -> return False
+        if text.startswith(("http://", "https://")):
+            logger.error("URLs are not supported input for ReversoAPI")
+            return False
 
         return True

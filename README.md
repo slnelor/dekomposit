@@ -19,7 +19,7 @@ understand them, and rebuild fluency through practice.
 - Async LLM client built on OpenAI SDK (works with OpenAI-compatible endpoints)
 - Agent loop with tool-calling support
 - Prompt system (`SOUL.md`, `MEMORY.md`, routing, language detection)
-- User memory model (topics, learning gaps, style adaptation)
+- User memory model (agent-managed free-form notes + recent history)
 - Translation tooling, including Adaptive MT integration
 - Translation output formatting presets
 
@@ -44,8 +44,8 @@ Create `.env` in the project root and set at least:
 ```env
 CURRENT_API_KEY=GEMINI_API_KEY
 GEMINI_API_KEY=your_api_key_here
-LLM_MODEL=gemini-flash-lite-latest
-LLM_SERVER=https://generativelanguage.googleapis.com/v1beta/openai/
+CURRENT_LLM=gemini-flash-lite-latest
+CURRENT_PROVIDER=gemini
 LLM_TEMPERATURE=1.0
 LLM_MAX_TOKENS=1024
 ```
@@ -80,6 +80,24 @@ dekomposit/
 - `docs/ARCHITECTURE.md` - AI-agent architecture and runtime flow
 - `docs/PROJECT_ANALYSIS.md` - current project state and practical roadmap
 - `docs/tech_requirements.md` - product and technical requirements for the agent
+
+## TUI (Textual)
+
+Run the interface:
+
+```bash
+python -m dekomposit.tui.main
+```
+
+Shortcuts:
+- `Tab` toggle normal/translation mode
+- `Ctrl+Tab` / `Ctrl+W` swap language pair
+- `/enru some text` set pair and send only `some text`
+
+Behavior:
+- translation mode uses strict translation prompting through the agent
+- `<translated>...</translated>` and `<translation>...</translation>` are rendered as styled translation bubbles (tags hidden)
+- slash pair commands support all `en`, `ru`, `uk`, `sk` combinations where source and target differ
 
 ## Note
 

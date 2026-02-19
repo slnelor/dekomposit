@@ -1,126 +1,130 @@
-import os
 import logging
 from functools import lru_cache
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator, cast
 
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
-from dekomposit.config import DEFAULT_LLM, DEFAULT_SERVER, CURRENT_API_KEY, LLM_CONFIG
+from dekomposit.config import get_settings
 
 
-logging.basicConfig(
-    datefmt="%d/%m/%Y %H:%M",
-    format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s",
-)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-LLM_SERVER = os.getenv("LLM_SERVER", DEFAULT_SERVER)
-if LLM_SERVER.lower() in ["none", "null"]:
-    LLM_SERVER = None
-
-LLM_MODEL = os.getenv("LLM_MODEL", DEFAULT_LLM)
 
 
 class Client:
-    """An AsyncOpenAI wrapper for dekomposit"""
+    """AsyncOpenAI wrapper for dekomposit."""
 
-    def __init__(
-        self,
-        model: str | None = None,
-        server: str | None = None,
-    ) -> None:
-        self.model = model or LLM_MODEL
-        self.server = server or LLM_SERVER
+    def __init__(self, model: str | None = None, provider: str | None = None) -> None:
+        settings = get_settings()
+
+        if provider:
+            resolved_provider = provider.strip().lower()
+            endpoint = settings.endpoint_for(resolved_provider)
+        else:
+            resolved_provider = settings.current_provider
+            endpoint = settings.current_endpoint
+
+        self.model = model or settings.current_llm
+        self.provider = resolved_provider
+        self.endpoint = endpoint
+        self.temperature = settings.llm_temperature
+        self.max_tokens = settings.llm_max_tokens
+        self.api_key_name = settings.current_api_key
+        self.api_key = settings.selected_api_key
 
     @staticmethod
     @lru_cache
-    def client() -> AsyncOpenAI:
-        return AsyncOpenAI(api_key=LLM_CONFIG[CURRENT_API_KEY], base_url=LLM_SERVER)
+    def _client_for(api_key: str, endpoint: str) -> AsyncOpenAI:
+        return AsyncOpenAI(api_key=api_key, base_url=endpoint)
+
+    def _client(self) -> AsyncOpenAI:
+        if not self.api_key:
+            raise ValueError(f"Missing API key value for env var '{self.api_key_name}'")
+        return self._client_for(self.api_key, self.endpoint)
 
     async def request(
         self,
-        messages: list[dict],
+        messages: list[dict[str, Any]],
         return_format: type[BaseModel],
         model: str | None = None,
         temperature: float | None = None,
         timeout: float = 30.0,
-    ):
-        """A method wrapper around openai.chat.completions.parse"""
+    ) -> Any:
+        """Wrapper around `chat.completions.parse`."""
         model = model or self.model
-        temperature = temperature if temperature is not None else LLM_CONFIG["temperature"]
+        temperature = self.temperature if temperature is None else temperature
+        completions = cast(Any, self._client().chat.completions)
 
-        response = await self.client().chat.completions.parse(
+        response = await completions.parse(
             model=model,
             messages=messages,
             response_format=return_format,
             temperature=temperature,
+            max_tokens=self.max_tokens,
             timeout=timeout,
         )
 
-        usage = response.usage
-        logger.info(
-            f"LLMCALL {response.id}\tTOKENS USED: {usage.prompt_tokens} (input); "
-            f"{usage.completion_tokens} (output); {usage.total_tokens} (total)"
-        )
-
+        usage = cast(Any, response.usage)
+        if usage:
+            logger.info(
+                "LLMCALL %s\tTOKENS USED: %s (input); %s (output); %s (total)",
+                response.id,
+                usage.prompt_tokens,
+                usage.completion_tokens,
+                usage.total_tokens,
+            )
         return response
 
     async def request_with_tools(
         self,
-        messages: list[dict],
-        tools: list[dict] | None = None,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
         model: str | None = None,
         temperature: float | None = None,
         timeout: float = 30.0,
-    ):
-        """A method wrapper around openai.chat.completions with tool calling.
-        
-        Args:
-            messages: Chat messages
-            tools: OpenAI tool definitions
-            model: Model to use
-            temperature: Sampling temperature
-            timeout: Request timeout
-            
-        Returns:
-            ChatCompletion response with tool_calls
-        """
+    ) -> Any:
+        """Wrapper around `chat.completions.create` with tools."""
         model = model or self.model
-        temperature = temperature if temperature is not None else LLM_CONFIG["temperature"]
+        temperature = self.temperature if temperature is None else temperature
+        completions = cast(Any, self._client().chat.completions)
 
-        response = await self.client().chat.completions.create(
+        response = await completions.create(
             model=model,
             messages=messages,
             tools=tools,
             temperature=temperature,
+            max_tokens=self.max_tokens,
             timeout=timeout,
         )
 
-        usage = response.usage
-        logger.info(
-            f"LLMCALL {response.id}\tTOKENS USED: {usage.prompt_tokens} (input); "
-            f"{usage.completion_tokens} (output); {usage.total_tokens} (total)"
-        )
-
+        usage = cast(Any, response.usage)
+        if usage:
+            logger.info(
+                "LLMCALL %s\tTOKENS USED: %s (input); %s (output); %s (total)",
+                response.id,
+                usage.prompt_tokens,
+                usage.completion_tokens,
+                usage.total_tokens,
+            )
         return response
 
     async def stream(
         self,
-        messages: list[dict],
+        messages: list[dict[str, Any]],
         model: str | None = None,
         temperature: float | None = None,
         timeout: float = 30.0,
     ) -> AsyncGenerator[str, None]:
         """Stream chat completions without structured output."""
         model = model or self.model
-        temperature = temperature if temperature is not None else LLM_CONFIG["temperature"]
+        temperature = self.temperature if temperature is None else temperature
+        completions = cast(Any, self._client().chat.completions)
 
-        stream = await self.client().chat.completions.create(
+        stream = await completions.create(
             model=model,
             messages=messages,
             temperature=temperature,
+            max_tokens=self.max_tokens,
             stream=True,
             timeout=timeout,
         )

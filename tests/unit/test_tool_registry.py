@@ -49,3 +49,12 @@ def test_registry_produces_openai_tool_schemas() -> None:
     assert function_schema["name"] == "dummy_tool"
     assert "description" in function_schema
     assert "parameters" in function_schema
+
+
+@pytest.mark.unit
+def test_registry_excludes_disabled_tools_from_schema() -> None:
+    registry = ToolRegistry(auto_discover=True)
+
+    schema_names = [item["function"]["name"] for item in registry.get_tool_schemas()]
+
+    assert "reverso_api" not in schema_names

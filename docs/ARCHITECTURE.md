@@ -31,11 +31,12 @@ The agent is async-first and centered around a loop where the model can observe 
 
 ### `dekomposit/config.py`
 
-Loads environment variables and defines LLM defaults:
+Typed runtime settings (`pydantic-settings`):
 
-- default model and server
-- selected API key name (`CURRENT_API_KEY`)
-- generation config (`temperature`, `max_tokens`)
+- model/provider resolution
+- provider key selection (`CURRENT_API_KEY` indirection)
+- provider endpoint mapping (`CURRENT_PROVIDER_ENDPOINTS`)
+- generation defaults (temperature/max tokens)
 
 ### `dekomposit/llm/base_client.py`
 
@@ -50,19 +51,31 @@ Async wrapper around `AsyncOpenAI`:
 
 Core orchestrator:
 
-- initializes client, tool registry, format registry, prompt registry, user memory
-- loads and composes base prompt (`SOUL.md` + `MEMORY.md`)
-- runs tool loop in `execute_tools()`
+- initializes client, tool registry, format registry, user memory
+- composes base prompt via `PromptComposer`
+- runs tool loop via `ToolLoopRunner`
 - exposes `handle_message()`, `chat()`, and `stream_chat()`
+
+### `dekomposit/llm/prompt_composer.py`
+
+Deterministic base prompt composition:
+
+- injects custom personality fragments
+- injects free-form memory markdown
+
+### `dekomposit/llm/tool_loop.py` + `dekomposit/llm/tool_executor.py`
+
+Orchestration and execution split:
+
+- iterative tool-calling loop (runner)
+- tool call parsing, execution, and result normalization (executor)
 
 ### `dekomposit/llm/memory.py`
 
-In-memory user profile model:
+In-memory free-form memory model:
 
-- learning gaps
-- preferred topics
-- speaking/teaching style
-- conversation history and mistake counters
+- notes chosen by the agent
+- bounded conversation history
 
 ### `dekomposit/llm/prompts/`
 
@@ -85,8 +98,8 @@ Tool interface and concrete tool implementations:
 - `BaseTool`: common async callable interface + JSON schema
 - `ToolRegistry`: auto-discovers tools and exposes schemas
 - `AdaptiveTranslationTool`: Google Cloud Adaptive MT translation
-- `MemoryTool`: allows model-driven memory updates
-- `ReversoAPI`: skeleton placeholder (not implemented)
+- `MemoryTool`: free-form note management (`add/get/remove/clear`)
+- `ReversoAPI`: intentionally disabled until implementation is ready
 
 ### `dekomposit/llm/formatting/`
 

@@ -47,5 +47,5 @@ class ToolCallResult(BaseModel):
     """Result of a tool call in the agentic loop."""
 
     tool_name: str = Field(description="Name of the tool that was called")
-    arguments: dict = Field(description="Arguments passed to the tool")
-    result: dict = Field(description="Result returned by the tool")
+    arguments: dict[str, object] = Field(description="Arguments passed to the tool")
+    result: dict[str, object] = Field(description="Result returned by the tool")

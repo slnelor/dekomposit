@@ -53,9 +53,7 @@ Note: current implementation provides the formatted translation core; richer dec
 ### 4) User memory and personalization
 
 - Track conversation history.
-- Track learning gaps (recurring mistake patterns).
-- Track topic interests.
-- Track teaching/speaking style preferences.
+- Track free-form memory notes selected by the agent.
 - Rebuild system prompt context from memory state.
 
 ### 5) Tool-enabled agent loop
@@ -94,8 +92,8 @@ Minimum expected variables:
 
 - `CURRENT_API_KEY`
 - provider key named by `CURRENT_API_KEY` (e.g., `GEMINI_API_KEY`)
-- `LLM_MODEL`
-- `LLM_SERVER`
+- `CURRENT_LLM`
+- `CURRENT_PROVIDER`
 - `LLM_TEMPERATURE`
 - `LLM_MAX_TOKENS`
 

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from pathlib import Path
 import subprocess
 from typing import Any, cast
 
@@ -10,12 +11,7 @@ from dotenv import load_dotenv
 from dekomposit.llm.tools.base import BaseTool
 
 
-logging.basicConfig(
-    datefmt="%d/%m/%Y %H:%M",
-    format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s",
-)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 load_dotenv()
 
@@ -64,7 +60,9 @@ class AdaptiveTranslationTool(BaseTool):
         if not dataset_id and source_lang and target_lang:
             dataset_id = f"adaptive-{source_lang.lower()}-{target_lang.lower()}"
 
-        if not self.validate_input(text, project_id, location, dataset_id, dataset_name):
+        if not self.validate_input(
+            text, project_id, location, dataset_id, dataset_name
+        ):
             raise ValueError("Invalid input for AdaptiveTranslationTool")
 
         if project_id is None or location is None:
@@ -181,6 +179,32 @@ class AdaptiveTranslationTool(BaseTool):
             if env_token:
                 return env_token
 
+        service_account_path = self._resolve_service_account_path()
+        if service_account_path:
+            try:
+                from google.auth.transport.requests import Request  # type: ignore[import-not-found]
+                from google.oauth2 import service_account  # type: ignore[import-not-found]
+
+                def refresh_sa_token() -> str:
+                    credentials = service_account.Credentials.from_service_account_file(
+                        service_account_path,
+                        scopes=[TRANSLATION_SCOPE],
+                    )
+                    credentials = cast(Any, credentials)
+                    credentials.refresh(Request())
+                    if not credentials.token:
+                        raise RuntimeError(
+                            "Failed to obtain access token from service account"
+                        )
+                    return credentials.token
+
+                return await asyncio.to_thread(refresh_sa_token)
+            except Exception as exc:
+                logger.warning(
+                    "Service account auth failed (%s), trying ADC/gcloud fallback",
+                    exc,
+                )
+
         try:
             import google.auth  # type: ignore[import-not-found]
             from google.auth.transport.requests import Request  # type: ignore[import-not-found]
@@ -197,6 +221,20 @@ class AdaptiveTranslationTool(BaseTool):
         except Exception as exc:
             logger.warning("ADC unavailable, falling back to gcloud: %s", exc)
             return await asyncio.to_thread(self._get_gcloud_token)
+
+    @staticmethod
+    def _resolve_service_account_path() -> str | None:
+        env_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        if env_path:
+            candidate = Path(env_path).expanduser()
+            if candidate.exists():
+                return str(candidate)
+
+        repo_default = Path(__file__).resolve().parents[3] / "secrets.json"
+        if repo_default.exists():
+            return str(repo_default)
+
+        return None
 
     @staticmethod
     def _get_gcloud_token() -> str:
@@ -227,21 +265,18 @@ class AdaptiveTranslationTool(BaseTool):
         return {
             "type": "object",
             "properties": {
-                "text": {
-                    "type": "string",
-                    "description": "Text to translate"
-                },
+                "text": {"type": "string", "description": "Text to translate"},
                 "source_lang": {
                     "type": "string",
-                    "description": "Source language code (en, ru, uk, sk)"
+                    "description": "Source language code (en, ru, uk, sk)",
                 },
                 "target_lang": {
                     "type": "string",
-                    "description": "Target language code (en, ru, uk, sk)"
+                    "description": "Target language code (en, ru, uk, sk)",
                 },
                 "dataset_id": {
                     "type": "string",
-                    "description": "Adaptive MT dataset ID (e.g., adaptive-en-ru)"
+                    "description": "Adaptive MT dataset ID (e.g., adaptive-en-ru)",
                 },
             },
             "required": ["text", "source_lang", "target_lang"],

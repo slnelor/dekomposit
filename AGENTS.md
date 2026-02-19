@@ -24,8 +24,8 @@ source .venv/bin/activate  # Linux/Mac
 .venv\Scripts\activate     # Windows
 
 # Environment variables are in .env (git-ignored)
-# Key variables: CURRENT_API_KEY, LLM_MODEL, LLM_SERVER, LLM_TEMPERATURE,
-#                LLM_MAX_TOKENS, TELEGRAM_BOT_TOKEN
+# Key variables: CURRENT_API_KEY, CURRENT_LLM, CURRENT_PROVIDER,
+#                LLM_TEMPERATURE, LLM_MAX_TOKENS, TELEGRAM_BOT_TOKEN
 ```
 
 ## Development Commands
@@ -86,7 +86,7 @@ def process_data(items: list[str]) -> dict[str, int]:
     ...
 
 # Modern union syntax
-def __init__(self, model: str | None = None, server: str | None = None) -> None:
+def __init__(self, model: str | None = None, provider: str | None = None) -> None:
     ...
 ```
 
@@ -176,9 +176,8 @@ if not user_id:
     raise ValueError("user_id is required")
 
 # Handle environment variables gracefully
-LLM_SERVER = os.getenv("LLM_SERVER", DEFAULT_SERVER)
-if LLM_SERVER.lower() in ["none", "null"]:
-    LLM_SERVER = None
+provider = os.getenv("CURRENT_PROVIDER", "gemini")
+model = os.getenv("CURRENT_LLM", "gemini-flash-lite-latest")
 ```
 
 **Rules**:

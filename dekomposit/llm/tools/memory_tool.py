@@ -9,21 +9,17 @@ logger = logging.getLogger(__name__)
 
 class MemoryTool(BaseTool):
     """Tool for agent to manage its memory about the user.
-    
+
     Allows the agent to:
-    - Add learning gaps (mistakes the user makes repeatedly)
-    - Add topics of interest
-    - Set teaching style preference
-    - Set speaking style preference
-    - Set tone/vibe
+    - Add free-form memory notes
     - View current memory state
-    - Remove items from memory
+    - Remove or clear notes
     """
 
     def __init__(self, agent: Any = None) -> None:
         super().__init__(
             name="memory",
-            description="Manage memory about the user. Use to record learning gaps, topics, preferences, and insights about the user. Call with action='get' to see current memory.",
+            description="Manage free-form memory notes about the user. Use add/get/remove/clear actions.",
         )
         self._agent = agent
 
@@ -34,30 +30,20 @@ class MemoryTool(BaseTool):
     async def __call__(
         self,
         action: str,
-        learning_gap: str | None = None,
-        topic: str | None = None,
-        teaching_style: str | None = None,
-        speaking_style: str | None = None,
-        tone_vibe: str | None = None,
-        remove_item: str | None = None,
-        remove_type: str | None = None,
+        note: str | None = None,
+        remove_note: str | None = None,
     ) -> dict[str, Any]:
         """Execute memory management action.
-        
+
         Args:
-            action: One of: 'add', 'set', 'get', 'remove', 'clear'
-            learning_gap: A pattern of mistake to remember (e.g., 'verb_conjugation', 'dativ_case')
-            topic: Topic of interest to add
-            teaching_style: 'explanation', 'practice', or 'balanced'
-            speaking_style: 'short', 'detailed', or 'casual'
-            tone_vibe: 'chill', 'energetic', 'serious', etc.
-            remove_item: Item to remove from a list
-            remove_type: Type of item to remove: 'learning_gap', 'topic'
-            
+            action: One of: 'add', 'get', 'remove', 'clear'
+            note: A free-form memory note to store
+            remove_note: A free-form memory note to remove
+
         Returns:
             Dict with status and current memory state
         """
-        if self._agent is None or not hasattr(self._agent, 'memory'):
+        if self._agent is None or not hasattr(self._agent, "memory"):
             return {
                 "status": "error",
                 "message": "Agent memory not available",
@@ -68,45 +54,40 @@ class MemoryTool(BaseTool):
         if action == "get":
             return {
                 "status": "success",
-                "learning_gaps": memory.learning_gaps,
-                "topics": memory.topics,
-                "teaching_style": memory.teaching_style,
-                "speaking_style": memory.speaking_style,
-                "tone_vibe": memory.tone_vibe,
-                "mistake_count": memory.mistake_count,
+                "notes": memory.notes,
+                "history_size": len(memory.conversation_history),
             }
 
         if action == "add":
-            if learning_gap:
-                if learning_gap not in memory.learning_gaps:
-                    memory.learning_gaps.append(learning_gap)
-                    logger.info(f"Added learning gap: {learning_gap}")
-            if topic:
-                memory.add_topic(topic)
-
-        elif action == "set":
-            if teaching_style:
-                memory.set_teaching_style(teaching_style)
-            if speaking_style:
-                memory.set_speaking_style(speaking_style)
-            if tone_vibe:
-                memory.set_tone_vibe(tone_vibe)
+            if not note:
+                return {
+                    "status": "error",
+                    "message": "Missing required 'note' for add action",
+                }
+            memory.add_note(note)
 
         elif action == "remove":
-            if remove_type == "learning_gap" and remove_item:
-                if remove_item in memory.learning_gaps:
-                    memory.learning_gaps.remove(remove_item)
-            elif remove_type == "topic" and remove_item:
-                if remove_item in memory.topics:
-                    memory.topics.remove(remove_item)
+            if not remove_note:
+                return {
+                    "status": "error",
+                    "message": "Missing required 'remove_note' for remove action",
+                }
+            removed = memory.remove_note(remove_note)
+            if not removed:
+                return {
+                    "status": "error",
+                    "message": "Note not found",
+                    "notes": memory.notes,
+                }
 
         elif action == "clear":
-            if remove_type == "learning_gaps":
-                memory.learning_gaps.clear()
-            elif remove_type == "topics":
-                memory.topics.clear()
-            elif remove_type == "history":
-                memory.conversation_history.clear()
+            memory.clear_notes()
+
+        else:
+            return {
+                "status": "error",
+                "message": f"Unsupported action: {action}",
+            }
 
         # Rebuild prompt with updated memory
         self._agent._rebuild_base_prompt()
@@ -114,9 +95,28 @@ class MemoryTool(BaseTool):
         return {
             "status": "success",
             "message": f"Memory updated: {action}",
-            "learning_gaps": memory.learning_gaps,
-            "topics": memory.topics,
-            "teaching_style": memory.teaching_style,
-            "speaking_style": memory.speaking_style,
-            "tone_vibe": memory.tone_vibe,
+            "notes": memory.notes,
+            "history_size": len(memory.conversation_history),
+        }
+
+    def get_schema(self) -> dict[str, Any]:
+        """Return OpenAI function calling schema."""
+        return {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "description": "One of: add, get, remove, clear",
+                    "enum": ["add", "get", "remove", "clear"],
+                },
+                "note": {
+                    "type": "string",
+                    "description": "Free-form note to store when action=add",
+                },
+                "remove_note": {
+                    "type": "string",
+                    "description": "Existing note to remove when action=remove",
+                },
+            },
+            "required": ["action"],
         }
