@@ -42,7 +42,8 @@ class MessageRow(Container):
         self._message = message
 
     def compose(self) -> ComposeResult:
-        yield ChatBubble(self._message)
+        with Container(classes="message-frame"):
+            yield ChatBubble(self._message)
 
 
 class DekompositTuiApp(App[None]):

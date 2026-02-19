@@ -46,78 +46,68 @@ Screen {
 #messages {
     height: 100%;
     overflow-y: auto;
-    padding: 0 0 1 0;
+    overflow-x: hidden;
+    padding: 0 1 1 1;
     background: #11141d;
-}
-
-.bubble {
-    width: 100%;
-    margin: 0;
-    padding: 1 2;
-    background: #141824;
-    color: #e7e3ce;
 }
 
 .message-row {
-    width: 100%;
-    border-bottom: solid #34382e;
-    background: #141824;
-    padding: 0 1;
+    margin: 0 0 1 0;
+    background: #11141d;
+    overflow-x: hidden;
 }
 
-.message-row.role-assistant {
+.message-frame {
+    width: 1fr;
+    padding: 0 1;
+    background: #11141d;
+    overflow-x: hidden;
+}
+
+.bubble {
+    width: 1fr;
     margin: 0;
+    padding: 1 1;
+    background: #11141d;
+    color: #e7e3ce;
+    overflow-x: hidden;
 }
 
 .message-row.role-user {
-    margin: 0 1;
+    margin: 0 1 1 1;
     border-left: solid #666c57;
     border-right: solid #666c57;
-    background: #181c27;
 }
 
-.message-row.role-user > .bubble {
-    background: #181c27;
+.message-row.role-user > .message-frame > .bubble {
     color: #efe9d4;
 }
 
-.message-row.role-system {
-    width: 100%;
-    margin: 0;
-    padding: 0 1;
-    border-bottom: none;
-    background: #11141d;
-}
-
-.message-row.role-system > .bubble {
-    padding: 0 1;
-    background: #11141d;
-    color: #8f9679;
-    text-style: italic;
-}
-
-.message-row.kind-translated {
+.message-row.role-assistant.kind-translated {
+    margin: 0 0 1 1;
     border-left: solid #99a56abf;
-    background: #171d22;
 }
 
-.message-row.kind-translated > .bubble {
-    background: #171d22;
+.message-row.kind-translated .bubble {
     color: #d2dba6;
 }
 
 .message-row.kind-error {
+    margin: 0 0 1 1;
     border-left: solid #af6d5fcc;
-    background: #251c20;
 }
 
-.message-row.kind-error > .bubble {
-    background: #251c20;
+.message-row.kind-error .bubble {
     color: #efc4bb;
 }
 
-.message-row.kind-info > .bubble {
+.message-row.kind-info .bubble {
     color: #a6ad88;
+}
+
+.message-row.role-system .bubble {
+    color: #8f9679;
+    text-style: italic;
 }
 
 #composer {

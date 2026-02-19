@@ -22,7 +22,8 @@ Like "User: Ako sa mas?; Agent: **used translation tool** How are you?" <- I jus
    b) choose the model
    c) fine-tune this
    d) deploy
-
+6. Remove google translation tools
+7. Agent get's only last message in chat, fix that
 ---
 
 # Refactoring (Completed)
