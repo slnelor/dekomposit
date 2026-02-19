@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 class ChatBubble(Static):
     def __init__(self, message: ChatMessage) -> None:
-        classes = f"bubble role-{message.role.value} kind-{message.kind.value}"
+        classes = "bubble"
         body = Text()
         if message.kind == MessageKind.TRANSLATED and message.pair_label:
             body.append(f"[{message.pair_label}]\n", style="italic #8f946f")
@@ -32,6 +32,17 @@ class ChatBubble(Static):
             body.append(message.text)
 
         super().__init__(body, classes=classes)
+
+
+class MessageRow(Container):
+    def __init__(self, message: ChatMessage) -> None:
+        super().__init__(
+            classes=f"message-row role-{message.role.value} kind-{message.kind.value}"
+        )
+        self._message = message
+
+    def compose(self) -> ComposeResult:
+        yield ChatBubble(self._message)
 
 
 class DekompositTuiApp(App[None]):
@@ -205,7 +216,7 @@ class DekompositTuiApp(App[None]):
 
     def _append_message(self, message: ChatMessage) -> None:
         transcript = self.query_one("#messages", VerticalScroll)
-        transcript.mount(ChatBubble(message))
+        transcript.mount(MessageRow(message))
         self.call_after_refresh(transcript.scroll_end, animate=False)
 
     def _refresh_chrome(self) -> None:
