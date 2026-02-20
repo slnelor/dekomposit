@@ -26,24 +26,26 @@ class ChatBubble(Static):
     def __init__(self, message: ChatMessage) -> None:
         classes = "bubble"
         body = Text()
-        if message.kind == MessageKind.TRANSLATED and message.pair_label:
-            body.append(f"[{message.pair_label}]\n", style="italic #8f946f")
-            body.append(message.text)
-        else:
-            body.append(message.text)
-
+        # In translation mode, the pair label is handled by the outer row now
+        # so we just render the raw text here.
+        body.append(message.text)
         super().__init__(body, classes=classes)
 
 
 class MessageRow(Widget):
     def __init__(self, message: ChatMessage) -> None:
-        super().__init__(
-            classes=f"message-row role-{message.role.value} kind-{message.kind.value}"
-        )
+        classes = f"message-row role-{message.role.value} kind-{message.kind.value}"
+        super().__init__(classes=classes)
         self._message = message
 
     def compose(self) -> ComposeResult:
-        yield ChatBubble(self._message)
+        # If it's a translated message, we render the pair label outside the main bubble
+        if self._message.kind == MessageKind.TRANSLATED and self._message.pair_label:
+            with Horizontal(classes="translated-layout"):
+                yield Static(f"[{self._message.pair_label}]", classes="pair-label")
+                yield ChatBubble(self._message)
+        else:
+            yield ChatBubble(self._message)
 
 
 class DekompositTuiApp(App[None]):
@@ -62,7 +64,7 @@ class DekompositTuiApp(App[None]):
         self._mode = ChatMode.NORMAL
         self._pair = LanguagePair()
         self._pending = False
-        self._status_text = "Ready."
+        self._status_text = ""
 
     @property
     def mode(self) -> ChatMode:
@@ -77,11 +79,12 @@ class DekompositTuiApp(App[None]):
             with Container(id="transcript-shell"):
                 yield VerticalScroll(id="messages")
             with Container(id="composer"):
-                yield Input(
-                    placeholder='Tip Prompt "Give me today\'s reading practice"',
-                    id="chat-input",
-                    classes="-textual-compact",
-                )
+                with Container(id="composer-inner"):
+                    yield Input(
+                        placeholder='Tip Prompt "Give me today\'s reading practice"',
+                        id="chat-input",
+                        classes="-textual-compact",
+                    )
             with Horizontal(id="footer-bar"):
                 yield Static(id="status-line")
                 yield Static(id="hint-line")
@@ -94,12 +97,12 @@ class DekompositTuiApp(App[None]):
         self._mode = (
             ChatMode.TRANSLATION if self._mode == ChatMode.NORMAL else ChatMode.NORMAL
         )
-        self._status_text = "Ready."
+        self._status_text = ""
         self._refresh_chrome()
 
     def action_swap_pair(self) -> None:
         self._pair = self._pair.swapped()
-        self._status_text = "Ready."
+        self._status_text = ""
         self._refresh_chrome()
 
     def action_focus_input(self) -> None:
@@ -124,13 +127,13 @@ class DekompositTuiApp(App[None]):
                     kind=MessageKind.ERROR,
                 )
             )
-            self._status_text = "Command failed."
+            self._status_text = ""
             self._refresh_chrome()
             return
 
         if parsed.pair is not None:
             self._pair = parsed.pair
-            self._status_text = "Ready."
+            self._status_text = ""
 
         text_to_send = parsed.text
         if not text_to_send:
@@ -178,7 +181,7 @@ class DekompositTuiApp(App[None]):
         try:
             reply = await self._service.ask(text=text, mode=mode, pair=pair)
             self._append_service_reply(reply=reply, pair=pair)
-            self._status_text = "Ready."
+            self._status_text = ""
         except Exception:
             logger.exception("Background chat worker failed")
             self._append_message(
