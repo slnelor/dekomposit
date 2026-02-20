@@ -46,26 +46,30 @@ Screen {
 /* User Message */
 .message-row.role-user {
     margin: 0;
-}
-
-.message-row.role-user > .bubble {
-    margin: 0;
     padding: 1 2 1 2;
     border-top: solid #3d3b36;
     border-left: solid #3d3b36;
     border-right: solid #3d3b36;
+}
+
+.message-row.role-user > .bubble {
+    margin: 0;
+    padding: 0;
+    border: none;
     color: #f6f4ed;
 }
 
 /* Regular Assistant Message */
 .message-row.role-assistant {
     margin: 1 0 0 0;
+    padding: 1 0 1 0;
+    border-top: solid #3d3b36;
 }
 
 .message-row.role-assistant > .bubble {
     margin: 0;
-    padding: 1 0 1 0;
-    border-top: solid #3d3b36;
+    padding: 0;
+    border: none;
     color: #e5e0cf;
 }
 
@@ -79,8 +83,8 @@ Screen {
     height: auto;
     layout: horizontal;
     margin: 0;
-    padding: 1 0 0 0;
-    border-top: solid #3d3b36;
+    padding: 0;
+    border: none;
 }
 
 .pair-label {
@@ -101,10 +105,11 @@ Screen {
 }
 
 /* Error/Info */
-.message-row.kind-error > .bubble {
-    margin: 0;
-    padding: 1 0 1 0;
+.message-row.kind-error {
     border-top: solid #af6d5f;
+}
+
+.message-row.kind-error > .bubble {
     color: #efc4bb;
 }
 
