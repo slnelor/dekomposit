@@ -7,35 +7,8 @@ Screen {
     layout: vertical;
     width: 100%;
     height: 100%;
-    padding: 1 2 0 2;
+    padding: 0 2 0 2;
     background: #11141d;
-}
-
-#topbar {
-    height: 2;
-    border-bottom: solid #34382e;
-    padding: 0 1;
-    margin-bottom: 1;
-    background: #11141d;
-}
-
-#brand {
-    width: 1fr;
-    content-align: left middle;
-    color: #888d77;
-    text-style: bold;
-}
-
-#chips {
-    width: auto;
-}
-
-.chip {
-    width: auto;
-    margin-left: 2;
-    padding: 0 1;
-    color: #b8bf91;
-    background: #161b27;
 }
 
 #transcript-shell {
@@ -47,75 +20,78 @@ Screen {
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 0 1 1 1;
+    scrollbar-size-vertical: 0;
+    border-top: solid #34382e;
+    padding: 1 1 1 1;
     background: #11141d;
 }
 
 .message-row {
-    margin: 0 0 1 0;
+    width: 100%;
+    height: auto;
+    margin: 0;
+    border-bottom: solid #34382e;
     background: #11141d;
-    overflow-x: hidden;
-}
-
-.message-frame {
-    width: 1fr;
-    padding: 0 1;
-    background: #11141d;
-    overflow-x: hidden;
+    overflow: hidden hidden;
 }
 
 .bubble {
-    width: 1fr;
+    width: 100%;
+    height: auto;
     margin: 0;
-    padding: 1 1;
+    padding: 1 2;
     background: #11141d;
     color: #e7e3ce;
     overflow-x: hidden;
 }
 
 .message-row.role-user {
-    margin: 0 1 1 1;
-    border-left: solid #666c57;
-    border-right: solid #666c57;
+    margin: 0;
 }
 
-.message-row.role-user > .message-frame > .bubble {
+.message-row.role-user > .bubble {
+    margin: 0 1;
+    border-left: solid #666c57;
+    border-right: solid #666c57;
     color: #efe9d4;
 }
 
 .message-row.role-assistant.kind-translated {
-    margin: 0 0 1 1;
-    border-left: solid #99a56abf;
+    margin: 0;
 }
 
-.message-row.kind-translated .bubble {
+.message-row.kind-translated > .bubble {
+    margin: 0 1;
+    border-left: solid #99a56a;
+    border-right: solid #666c57;
     color: #d2dba6;
 }
 
 .message-row.kind-error {
-    margin: 0 0 1 1;
-    border-left: solid #af6d5fcc;
+    margin: 0;
 }
 
-.message-row.kind-error .bubble {
+.message-row.kind-error > .bubble {
+    margin: 0 1;
+    border-left: solid #af6d5f;
     color: #efc4bb;
 }
 
-.message-row.kind-info .bubble {
+.message-row.kind-info > .bubble {
     color: #a6ad88;
 }
 
-.message-row.role-system .bubble {
+.message-row.role-system > .bubble {
     color: #8f9679;
     text-style: italic;
 }
 
 #composer {
     height: 3;
-    margin-top: 1;
+    margin-top: 0;
     border-top: solid #34382e;
     border-bottom: solid #34382e;
-    background: #111620;
+    background: transparent;
     padding: 0 1;
 }
 
@@ -124,13 +100,14 @@ Screen {
     width: 100%;
     padding: 0;
     border: none;
-    background: #111620;
+    background: transparent;
     color: #efe8cf;
 }
 
 #chat-input:focus {
     border: none;
-    background: #111620;
+    background: transparent;
+    background-tint: transparent;
 }
 
 #chat-input > .input--placeholder,
@@ -161,5 +138,6 @@ Screen {
 
 #hint-line {
     width: auto;
+    content-align: right middle;
     color: #7f866d;
 }

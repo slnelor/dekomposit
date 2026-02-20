@@ -5,6 +5,7 @@ from textual import events, on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, VerticalScroll
+from textual.widget import Widget
 from textual.widgets import Input, Static
 
 from dekomposit.tui.input_parser import parse_input
@@ -34,7 +35,7 @@ class ChatBubble(Static):
         super().__init__(body, classes=classes)
 
 
-class MessageRow(Container):
+class MessageRow(Widget):
     def __init__(self, message: ChatMessage) -> None:
         super().__init__(
             classes=f"message-row role-{message.role.value} kind-{message.kind.value}"
@@ -42,8 +43,7 @@ class MessageRow(Container):
         self._message = message
 
     def compose(self) -> ComposeResult:
-        with Container(classes="message-frame"):
-            yield ChatBubble(self._message)
+        yield ChatBubble(self._message)
 
 
 class DekompositTuiApp(App[None]):
@@ -74,11 +74,6 @@ class DekompositTuiApp(App[None]):
 
     def compose(self) -> ComposeResult:
         with Container(id="root"):
-            with Horizontal(id="topbar"):
-                yield Static("dekomposit", id="brand")
-                with Horizontal(id="chips"):
-                    yield Static(id="mode-indicator", classes="chip")
-                    yield Static(id="pair-indicator", classes="chip")
             with Container(id="transcript-shell"):
                 yield VerticalScroll(id="messages")
             with Container(id="composer"):
@@ -89,10 +84,7 @@ class DekompositTuiApp(App[None]):
                 )
             with Horizontal(id="footer-bar"):
                 yield Static(id="status-line")
-                yield Static(
-                    "Ctrl+Tab/Ctrl+W swap languages   Tab toggle mode",
-                    id="hint-line",
-                )
+                yield Static(id="hint-line")
 
     def on_mount(self) -> None:
         self.query_one("#chat-input", Input).focus()
@@ -102,12 +94,12 @@ class DekompositTuiApp(App[None]):
         self._mode = (
             ChatMode.TRANSLATION if self._mode == ChatMode.NORMAL else ChatMode.NORMAL
         )
-        self._status_text = f"Mode set to {self._mode.value}."
+        self._status_text = "Ready."
         self._refresh_chrome()
 
     def action_swap_pair(self) -> None:
         self._pair = self._pair.swapped()
-        self._status_text = f"Language pair: {self._pair.label}."
+        self._status_text = "Ready."
         self._refresh_chrome()
 
     def action_focus_input(self) -> None:
@@ -138,7 +130,7 @@ class DekompositTuiApp(App[None]):
 
         if parsed.pair is not None:
             self._pair = parsed.pair
-            self._status_text = f"Language pair: {self._pair.label}."
+            self._status_text = "Ready."
 
         text_to_send = parsed.text
         if not text_to_send:
@@ -221,15 +213,17 @@ class DekompositTuiApp(App[None]):
         self.call_after_refresh(transcript.scroll_end, animate=False)
 
     def _refresh_chrome(self) -> None:
-        mode_name = "TRANSLATION" if self._mode == ChatMode.TRANSLATION else "NORMAL"
-        mode_indicator = self.query_one("#mode-indicator", Static)
-        pair_indicator = self.query_one("#pair-indicator", Static)
+        mode_name = "Translation" if self._mode == ChatMode.TRANSLATION else "Normal"
         status_line = self.query_one("#status-line", Static)
+        hint_line = self.query_one("#hint-line", Static)
         prompt = self.query_one("#chat-input", Input)
 
-        mode_indicator.update(f"Mode: {mode_name}")
-        pair_indicator.update(f"Pair: {self._pair.label}")
-        status_line.update(self._status_text)
+        mode_text = f"[{self._pair.label}] {mode_name}"
+        if self._status_text not in {"Ready.", ""}:
+            mode_text = f"{mode_text} - {self._status_text}"
+
+        status_line.update(mode_text)
+        hint_line.update("Ctrl + Tab - Swap languages   Tab - Switch Mode")
 
         if self._mode == ChatMode.TRANSLATION:
             prompt.placeholder = f"Translate ({self._pair.label})..."
